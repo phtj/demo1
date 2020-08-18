@@ -5,7 +5,6 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 		<link type="text/css" rel="stylesheet" href="main.css">
-		<script src="https://threejs.org/build/three.js"></script>
 		<style>
 			body {
 				background-color: #bfe3dd;
@@ -29,14 +28,13 @@
 		</div>
 
 		<script type="module">
-
-			import * as THREE from 'three.module.js';
-
-			import Stats from 'three/examples/jsm/libs/stats.module.js';
-
-			import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-			import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-			import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+		
+			import * as THREE from 'https://unpkg.com/three@0.119.1/build/three.module.js';
+			
+			import { OrbitControls } from 'https://unpkg.com/three@0.119.1/examples/jsm/controls/OrbitControls.js';
+			import { GLTFLoader } from 'https://unpkg.com/three@0.119.1/examples/jsm/loaders/GLTFLoader.js';
+			import { DRACOLoader } from 'https://unpkg.com/three@0.119.1/examples/jsm/loaders/DRACOLoader.js';
+			import Stats from 'https://unpkg.com/three@0.119.1/examples/jsm/libs/stats.module.js';
 
 			var scene, camera, dirLight, stats;
 			var renderer, mixer, controls;
@@ -81,7 +79,7 @@
 			] );
 
 			var dracoLoader = new DRACOLoader();
-			dracoLoader.setDecoderPath( 'js/libs/draco/gltf/' );
+			dracoLoader.setDecoderPath( 'https://unpkg.com/three@0.119.1/examples/js/libs/draco/gltf/' );
 
 			var loader = new GLTFLoader();
 			loader.setDRACOLoader( dracoLoader );
