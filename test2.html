@@ -82,7 +82,7 @@
 			dracoLoader.setDecoderPath( 'https://unpkg.com/three@0.119.1/examples/js/libs/draco/gltf/' );
 
 			var loader = new GLTFLoader();
-			loader.setDRACOLoader( dracoLoader );
+			// loader.setDRACOLoader( dracoLoader );
 			loader.load( 'blenderExported.glb', function ( gltf ) {
 
 				var model = gltf.scene;
