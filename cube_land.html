@@ -7,9 +7,7 @@
 		<link type="text/css" rel="stylesheet" href="main.css">
 	</head>
 	<body>
-		
 		<script type="module">
-
 
 			// ------------------------------------------------
 			// Import statements
@@ -24,7 +22,8 @@
 
 			var camera, scene, renderer, dirLight, dirLightHeper, hemiLight, hemiLightHelper;
 
-			var box_geom = new THREE.BoxBufferGeometry( 20, 20, 20 );
+			var box_size = 100;
+			var box_geom = new THREE.BoxBufferGeometry( box_size, box_size, box_size );
 			var box_mat = new THREE.MeshPhongMaterial({
 				color: 0xff0000,
 				shading: THREE.FlatShading
@@ -90,14 +89,9 @@
 				dirLight.castShadow = true;
 				dirLight.shadow.mapSize.width = 2048;
 				dirLight.shadow.mapSize.height = 2048;
-				var d = 50;
-				dirLight.shadow.camera.left = - d;
-				dirLight.shadow.camera.right = d;
-				dirLight.shadow.camera.top = d;
-				dirLight.shadow.camera.bottom = - d;
-				dirLight.shadow.camera.far = 1;
+				dirLight.shadow.camera.near = 1;
 				dirLight.shadow.camera.far = 5000;
-				dirLight.shadow.bias = - 0.0001;
+				dirLight.shadow.autoUpdate = true;
 
 				// DIRECTIONAL LIGHT HELPER
 
@@ -106,8 +100,9 @@
 
 				// GROUND
 
-				var groundGeo = new THREE.PlaneBufferGeometry( 10000, 10000 );
+				var groundGeo = new THREE.PlaneBufferGeometry( 1000, 1000 );
 				var groundMat = new THREE.MeshLambertMaterial( { color: 0xffffff } );
+				// var groundMat = new THREE.MeshStandardMaterial( { color: 'white' } )
 				groundMat.color.setHSL( 0.095, 1, 0.75 );
 				var ground = new THREE.Mesh( groundGeo, groundMat );
 				ground.receiveShadow = true;
@@ -118,6 +113,8 @@
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
 				renderer.setPixelRatio( window.devicePixelRatio );
 				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap; // default THREE.PCFShadowMap
 				document.body.appendChild( renderer.domElement );
 				
 				// ORBIT CONTROL
@@ -164,20 +161,19 @@
 					return;
 				}
 				var pos = getMouseClick3DPos(event);
-				pos.x = Math.round(pos.x / 20) * 20;
-				pos.y = Math.round(pos.y / 20) * 20;
+				pos.x = Math.round(pos.x / box_size) * box_size;
+				pos.y = Math.round(pos.y / box_size) * box_size;
 				var key = pos.x + '_' + pos.y;
 				if (key in boxes) {
 					scene.remove( boxes[key] );
 					delete boxes[key];
 				} else {
-					pos.z = 10;
 					var box = new THREE.Mesh( box_geom, box_mat );
 					box.castShadow = true;
-					box.receiveShadow = true;
+					box.receiveShadow = false;
 					box.position.x = pos.x;
 					box.position.y = pos.y;
-					box.position.z = 10;
+					box.position.z =  box_size/2;
 					scene.add( box );
 					boxes[key] = box;
 				}
@@ -202,6 +198,5 @@
 			}
 
 		</script>
-
 	</body>
 </html>
