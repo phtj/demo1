@@ -20,7 +20,7 @@
 			// Main code
 			// ------------------------------------------------
 
-			var camera, scene, renderer, dirLight, dirLightHeper, hemiLight, hemiLightHelper;
+			var camera, scene, renderer, dirLight, dirLightHeper, dirLightShadowHeper, hemiLight, hemiLightHelper;
 
 			var box_size = 100;
 			var box_geom = new THREE.BoxBufferGeometry( box_size, box_size, box_size );
@@ -60,7 +60,7 @@
 				// SCENE BACKGROUND AND FOG
 
 				scene.background = new THREE.Color().setHSL( 0.6, 0, 1 );
-				scene.fog = new THREE.Fog( scene.background, 1, 3000 );
+				scene.fog = new THREE.Fog( scene.background, 1, 7000 );
 
 				// HEMISPHERE LIGHT
 
@@ -80,9 +80,14 @@
 
 				dirLight = new THREE.DirectionalLight( 0xffffff, 1 );
 				dirLight.color.setHSL( 0.1, 1, 0.95 );
-				dirLight.position.set( -5, -5, 5 );
-				dirLight.position.multiplyScalar( 50 );
+				dirLight.position.set( -1, -1, 1 );
+				dirLight.position.multiplyScalar( 1000 );
 				scene.add( dirLight );
+
+				// DIRECTIONAL LIGHT HELPER
+
+				dirLightHeper = new THREE.DirectionalLightHelper( dirLight, 100 );
+				scene.add( dirLightHeper );
 
 				// DIRECTIONAL LIGHT SHADOWS
 
@@ -90,13 +95,17 @@
 				dirLight.shadow.mapSize.width = 2048;
 				dirLight.shadow.mapSize.height = 2048;
 				dirLight.shadow.camera.near = 1;
-				dirLight.shadow.camera.far = 5000;
-				dirLight.shadow.autoUpdate = true;
+				dirLight.shadow.camera.far = 3000;
+				dirLight.shadow.camera.left = -500;
+				dirLight.shadow.camera.bottom = -500;
+				dirLight.shadow.camera.top = 500;
+				dirLight.shadow.camera.right = 500;
+				// dirLight.shadow.autoUpdate = true;
 
-				// DIRECTIONAL LIGHT HELPER
+				// DIRECTIONAL LIGHT SHADOWS HELPER
 
-				dirLightHeper = new THREE.DirectionalLightHelper( dirLight, 100 );
-				scene.add( dirLightHeper );
+				dirLightShadowHeper = new THREE.CameraHelper( dirLight.shadow.camera );
+				scene.add( dirLightShadowHeper );
 
 				// GROUND
 
@@ -170,7 +179,7 @@
 				} else {
 					var box = new THREE.Mesh( box_geom, box_mat );
 					box.castShadow = true;
-					box.receiveShadow = false;
+					box.receiveShadow = true;
 					box.position.x = pos.x;
 					box.position.y = pos.y;
 					box.position.z =  box_size/2;
