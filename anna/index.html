@@ -95,11 +95,12 @@
 				dracoLoader.setDecoderPath( 'https://unpkg.com/three@0.119.1/examples/js/libs/draco/gltf/' );						
 				const loader = new GLTFLoader();
 				loader.setDRACOLoader( dracoLoader );
+				console.log("y  = 90")
 				loader.load( 
 					'BISHANROOM.glb', 
 					gltf => {
 						const model = gltf.scene;
-						model.rotation.x = -Math.PI / 2;
+						model.rotation.y = Math.PI / 2;
 						model.position.set( 0, 0, 0 );
 						// model.scale.set( 1, 1, 1 );
 						scene.add(model);
