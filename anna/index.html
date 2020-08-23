@@ -64,11 +64,13 @@
 				camera.position.set( 0, 2, 8);
 				scene = new THREE.Scene();
 
-				// SCENE GRID
+				// SCENE GRID AND AXES
 
 				var gridGround = new THREE.GridHelper( 10, 10, 0x3f3f3f, 0x3f3f3f );
 				gridGround.rotation.x = Math.PI / 2;
 				scene.add( gridGround );
+				var axesHelper = new THREE.AxesHelper( 12 );
+				scene.add( axesHelper );
 
 				// RENDERER
 
@@ -100,8 +102,9 @@
 					'BISHANROOM.glb', 
 					gltf => {
 						const model = gltf.scene;
+						// the order does not matter
+						model.position.set( 10, -10, 0 );
 						model.rotation.z = Math.PI / 2;
-						model.position.set( 0, 0, 0 );
 						// model.scale.set( 1, 1, 1 );
 						scene.add(model);
 					},
