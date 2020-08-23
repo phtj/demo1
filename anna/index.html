@@ -11,9 +11,9 @@
 		</div>
 		
 		<!-- <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"> -->
-		<!-- <base href="/anna/"> -->
+		<base href="/">
 		<!-- <link type="text/css" rel="stylesheet" href="main.css"> -->
-		
+
 		<style>
 			body {
 				background-color: #f5d4df;
@@ -99,9 +99,9 @@
 					'BISHANROOM.glb', 
 					gltf => {
 						const model = gltf.scene;
-						model.position.set( -18, 0, 0 );
+						model.position.set( -10, 0, 11 );
 						model.scale.set( 1, 1, 1 );
-						model.rotation.x = -90/180*Math.PI;
+						model.rotation.x = - Math.PI / 2;
 						scene.add(model);
 					},
 					xhr => console.log(`Progress loading model: ${(xhr.loaded/xhr.total * 100)}% loaded`),
