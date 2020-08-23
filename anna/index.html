@@ -104,7 +104,7 @@
 						model.rotation.y = Math.PI / 2;
 						scene.add(model);
 					},
-					xhr => console.log(`Progress loading model: ${(xhr.loaded)} bytes loaded`),
+					xhr => console.log("Loading model..."),
 					err => console.error("Error loading model:", err)
 				);    
 
