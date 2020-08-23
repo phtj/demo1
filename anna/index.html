@@ -101,10 +101,10 @@
 						const model = gltf.scene;
 						model.position.set( -10, 0, 11 );
 						model.scale.set( 1, 1, 1 );
-						model.rotation.x = - Math.PI / 2;
+						// model.rotation.x = - Math.PI / 2;
 						scene.add(model);
 					},
-					xhr => console.log(`Progress loading model: ${(xhr.loaded/xhr.total * 100)}% loaded`),
+					xhr => console.log(`Progress loading model: ${(xhr.loaded)} bytes loaded`),
 					err => console.error("Error loading model:", err)
 				);    
 
