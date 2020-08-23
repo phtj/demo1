@@ -80,7 +80,7 @@
 
 				dirLight = new THREE.DirectionalLight( 0xffffff, 1 );
 				dirLight.color.setHSL( 0.1, 1, 0.95 );
-				dirLight.position.set( -1, -1, 1 );
+				dirLight.position.set( -0.9, -0.8, 1.1 );
 				dirLight.position.multiplyScalar( 1000 );
 				scene.add( dirLight );
 
@@ -100,7 +100,6 @@
 				dirLight.shadow.camera.bottom = -500;
 				dirLight.shadow.camera.top = 500;
 				dirLight.shadow.camera.right = 500;
-				// dirLight.shadow.autoUpdate = true;
 
 				// DIRECTIONAL LIGHT SHADOWS HELPER
 
