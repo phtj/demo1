@@ -25,21 +25,19 @@
 
 			var camera, scene, renderer, ground,
 			dir_light, dir_light_helper, dir_lightShadowHeper, hemi_light, hemi_light_helper, 
-			raycaster, mouse;
+			raycaster, mouse, box_trans, box_trans_del;;
 
+			// box and canvas
 			var box_size = 88;
-			var num_cells = Math.round(1000 / box_size)
-			var ground_size = num_cells * box_size;
-			console.log("num cells = ", num_cells);
-
+			var box_size_half = box_size / 2;
 			var box_geom = new THREE.BoxBufferGeometry( box_size, box_size, box_size );
 			var box_geom_del = new THREE.BoxBufferGeometry( box_size * 1.1, box_size * 1.1, box_size * 1.1 );
 
-			// var box_mat = new THREE.MeshPhongMaterial({
-			// 	color: 0xff0000,
-			// 	shading: THREE.FlatShading
-			// });
+			// ground
+			var num_cells = Math.round(1000 / box_size)
+			var ground_size = num_cells * box_size;
 
+			//materials
 			var box_mat = new THREE.MeshLambertMaterial( {
 				color: 'blue',
 
@@ -50,11 +48,11 @@
     			transparent: true,
 			});
 
+			// mouse
 			var mouse = new THREE.Vector2();
 			var mouse_down = new THREE.Vector2();
-			var mouse_pos = new THREE.Vector3();
 
-			var box_trans, box_trans_del;
+			// box settings
 			var boxes = {};
 			var box_pos = null;
 			var del_box = false;
@@ -175,7 +173,7 @@
 				// EVENT LISTENERS
 
 				window.addEventListener( 'resize', onWindowResize, false );
-				document.addEventListener('mouse_down', onmouse_down, false);
+				document.addEventListener('mousedown', onMouseDown, false);
 				document.addEventListener('mouseup', onMouseUp, false);
 				document.addEventListener( 'mousemove', onMouseMove, false );
 
@@ -193,7 +191,7 @@
 			}
 
 			// Handle mouse click events, save the screen position when mouse down
-			function onmouse_down(event) {
+			function onMouseDown(event) {
 				mouse_down.x = event.clientX;
 				mouse_down.y = event.clientY
 			}
@@ -205,7 +203,9 @@
 					return;
 				}
 				if (box_pos != null) {
-					var key = box_pos.x + '_' + box_pos.y + '_' + box_pos.z;
+					var key = box_pos.x / box_size_half + '_' + box_pos.y  / box_size_half + '_' + box_pos.z / box_size_half;
+					// var key = box_pos.x + '_' + box_pos.y  + '_' + box_pos.z;
+					// console.log("key = ", key);
 					if (del_box && key in boxes) {
 						scene.remove( boxes[key] );
 						delete boxes[key];
@@ -296,9 +296,8 @@
 									box_pos.x = Math.round(isect0.point.x / box_size) * box_size;
 									box_pos.y = Math.round(isect0.point.y / box_size) * box_size;
 								} else { // even number of cells
-									var half = box_size / 2;
-									box_pos.x = Math.round((half + isect0.point.x) / box_size) * box_size - half;
-									box_pos.y = Math.round((half + isect0.point.y) / box_size) * box_size - half;
+									box_pos.x = Math.round((box_size_half + isect0.point.x) / box_size) * box_size - box_size_half;
+									box_pos.y = Math.round((box_size_half + isect0.point.y) / box_size) * box_size - box_size_half;
 								}
 								box_pos.z = box_size / 2;
 								box_trans.position.set(box_pos.x, box_pos.y, box_pos.z);
