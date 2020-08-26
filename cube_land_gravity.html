@@ -204,18 +204,29 @@
 					return;
 				}
 				if (box_pos != null) {
-					var key = box_pos.x / box_size_half + '_' + box_pos.y  / box_size_half + '_' + box_pos.z / box_size_half;
-					// var key = box_pos.x + '_' + box_pos.y  + '_' + box_pos.z;
-					// console.log("key = ", key);
+					var coords = new THREE.Vector3(box_pos.x / box_size_half, box_pos.y  / box_size_half, box_pos.z / box_size_half);
+					// create a key that is a string that looks something like this: 1_2_3
+					var key = coords.x + '_' + coords.y + '_' + coords.z;
 					if (del_box && key in boxes) {
+						// delete an existing box
 						scene.remove( boxes[key] );
 						delete boxes[key];
+						// delete other floating boxes not connected to ground
+						var clusters = findClusters();
+						for (var cluster of clusters) {
+							if (!clusterOnGround(cluster)) {
+								deleteCluster(cluster);
+							}
+						}
 					} else if (!del_box) {
+						// add a new box
 						var box = new THREE.Mesh( box_geom, box_mat );
 						box.castShadow = true;
 						box.receiveShadow = true;
 						box.position.set(box_pos.x, box_pos.y, box_pos.z);
 						box.name = "box"
+						box.coords = coords;
+						box.key = key;
 						scene.add( box );
 						boxes[key] = box;
 					}
@@ -250,7 +261,7 @@
 
 			// render
 			function render() {
-				// get the object in teh scene to check for intersections
+				// get the objects in the scene to check for intersections
 				// the boxes and the ground
 				var isect_objs = Object.values(boxes); 
 				isect_objs.push(ground);
@@ -320,7 +331,75 @@
 				renderer.render( scene, camera );
 			}
 
+			// ------------------------------------------------
+			// Helper functions
+			// -----------------------------------------------
 
+			// Find all clusters of connected boxes
+			function findClusters() {
+				var keys = Object.keys(boxes);
+				var clusters = [];
+				for (var key of keys) {
+					var found = false;
+					for (var cluster of clusters) {
+						if (key in cluster) {
+							found = true;
+							break;
+						}
+					}
+					if (!found) {
+						var new_cluster = {};
+						addToCluster(boxes[key], new_cluster);
+						clusters.push(new_cluster);
+					}
+				}
+				return clusters;
+			}
+
+			// Find a single cluster of connected boxes, starting from one box
+			// This is a recirsive function
+			function addToCluster(box, cluster) {
+				if (!(box.key in cluster)) {
+					cluster[box.key] = box;
+					for (var neighbour of getNeighbours(box)) {
+						addToCluster(neighbour, cluster);
+					}
+				}
+			}
+
+			// Return true if cluster touches ground
+			function clusterOnGround(cluster) {
+				for (var box of Object.values(cluster)) {
+					if (box.coords.z == 1) { return true; }
+				}
+				return false;
+			}
+
+			// Delete all boxes in a cluster
+			function deleteCluster(cluster) {
+				for (var box of Object.values(cluster)) {
+					scene.remove( box );
+					delete boxes[box.key];
+				}
+			}
+
+			// Get all the neighbours of a box
+			// 6 neighbours
+			// up, down, north, south, east, west
+			function getNeighbours(box) {
+				var coords = box.coords;
+				var u = boxes[coords.x + '_' + coords.y + '_' + (coords.z + 2)];
+				var d = boxes[coords.x + '_' + coords.y + '_' + (coords.z - 2)];
+				var n = boxes[coords.x + '_' + (coords.y + 2) + '_' + coords.z];
+				var s = boxes[coords.x + '_' + (coords.y - 2) + '_' + coords.z];
+				var e = boxes[(coords.x + 2) + '_' + coords.y + '_' + coords.z]; 
+				var w = boxes[(coords.x - 2) + '_' + coords.y + '_' + coords.z];
+				var neighbours = [];
+				for (var neighbour of [u, d, n, s, e, w]) {
+					if (neighbour != undefined) { neighbours.push(neighbour); }
+				}
+				return neighbours;
+			}
 		</script>
 	</body>
 </html>
