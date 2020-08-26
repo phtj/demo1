@@ -24,7 +24,7 @@
 			// ------------------------------------------------
 
 			var camera, scene, renderer, ground,
-			dirLight, dirLightHeper, dirLightShadowHeper, hemiLight, hemiLightHelper, 
+			dir_light, dir_light_helper, dir_lightShadowHeper, hemi_light, hemi_light_helper, 
 			raycaster, mouse;
 
 			var box_size = 88;
@@ -50,11 +50,9 @@
     			transparent: true,
 			});
 
-
 			var mouse = new THREE.Vector2();
-			var mouseDown = new THREE.Vector2();
-			var mouseVec = new THREE.Vector3();
-			var mousePos = new THREE.Vector3();
+			var mouse_down = new THREE.Vector2();
+			var mouse_pos = new THREE.Vector3();
 
 			var box_trans, box_trans_del;
 			var boxes = {};
@@ -87,11 +85,11 @@
 
 				// GROUND
 
-				var groundGeo = new THREE.PlaneBufferGeometry( ground_size, ground_size );
-				var groundMat = new THREE.MeshLambertMaterial( { color: 0xffffff } );
-				// var groundMat = new THREE.MeshStandardMaterial( { color: 'white' } )
-				groundMat.color.setHSL( 0.095, 1, 0.75 );
-				ground = new THREE.Mesh( groundGeo, groundMat );
+				var ground_geo = new THREE.PlaneBufferGeometry( ground_size, ground_size );
+				var ground_mat = new THREE.MeshLambertMaterial( { color: 0xffffff } );
+				// var ground_mat = new THREE.MeshStandardMaterial( { color: 'white' } )
+				ground_mat.color.setHSL( 0.095, 1, 0.75 );
+				ground = new THREE.Mesh( ground_geo, ground_mat );
 				ground.receiveShadow = true;
 				scene.add( ground );
 
@@ -115,47 +113,47 @@
 
 				// HEMISPHERE LIGHT
 
-				hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
-				hemiLight.color.setHSL( 0.6, 1, 0.6 );
-				hemiLight.groundColor.setHSL( 0.095, 1, 0.75 );
-				hemiLight.position.set( 0, 0, 300 );
-				hemiLight.up.set( 0, 0, 0 );
-				scene.add( hemiLight );
+				hemi_light = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
+				hemi_light.color.setHSL( 0.6, 1, 0.6 );
+				hemi_light.groundColor.setHSL( 0.095, 1, 0.75 );
+				hemi_light.position.set( 0, 0, 300 );
+				hemi_light.up.set( 0, 0, 0 );
+				scene.add( hemi_light );
 
 				// HEMISPHERE LIGHT HELPER
 
-				hemiLightHelper = new THREE.HemisphereLightHelper( hemiLight, 100 );
-				scene.add( hemiLightHelper );
+				hemi_light_helper = new THREE.HemisphereLightHelper( hemi_light, 100 );
+				scene.add( hemi_light_helper );
 
 				// DIRECTIONAL LIGHT
 
-				dirLight = new THREE.DirectionalLight( 0xffffff, 1 );
-				dirLight.color.setHSL( 0.1, 1, 0.95 );
-				dirLight.position.set( -0.9, -0.8, 1.1 );
-				dirLight.position.multiplyScalar( 1000 );
-				scene.add( dirLight );
+				dir_light = new THREE.DirectionalLight( 0xffffff, 1 );
+				dir_light.color.setHSL( 0.1, 1, 0.95 );
+				dir_light.position.set( -0.9, -0.8, 1.1 );
+				dir_light.position.multiplyScalar( 1000 );
+				scene.add( dir_light );
 
 				// DIRECTIONAL LIGHT HELPER
 
-				dirLightHeper = new THREE.DirectionalLightHelper( dirLight, 100 );
-				scene.add( dirLightHeper );
+				dir_light_helper = new THREE.DirectionalLightHelper( dir_light, 100 );
+				scene.add( dir_light_helper );
 
 				// DIRECTIONAL LIGHT SHADOWS
 
-				dirLight.castShadow = true;
-				dirLight.shadow.mapSize.width = 2048;
-				dirLight.shadow.mapSize.height = 2048;
-				dirLight.shadow.camera.near = 1;
-				dirLight.shadow.camera.far = 3000;
-				dirLight.shadow.camera.left = -500;
-				dirLight.shadow.camera.bottom = -500;
-				dirLight.shadow.camera.top = 500;
-				dirLight.shadow.camera.right = 500;
+				dir_light.castShadow = true;
+				dir_light.shadow.mapSize.width = 2048;
+				dir_light.shadow.mapSize.height = 2048;
+				dir_light.shadow.camera.near = 1;
+				dir_light.shadow.camera.far = 3000;
+				dir_light.shadow.camera.left = -500;
+				dir_light.shadow.camera.bottom = -500;
+				dir_light.shadow.camera.top = 500;
+				dir_light.shadow.camera.right = 500;
 
 				// DIRECTIONAL LIGHT SHADOWS HELPER
 
-				dirLightShadowHeper = new THREE.CameraHelper( dirLight.shadow.camera );
-				scene.add( dirLightShadowHeper );
+				dir_lightShadowHeper = new THREE.CameraHelper( dir_light.shadow.camera );
+				scene.add( dir_lightShadowHeper );
 
 				// RENDERER
 
@@ -177,12 +175,11 @@
 				// EVENT LISTENERS
 
 				window.addEventListener( 'resize', onWindowResize, false );
-				document.addEventListener('mousedown', onMouseDown, false);
+				document.addEventListener('mouse_down', onmouse_down, false);
 				document.addEventListener('mouseup', onMouseUp, false);
 				document.addEventListener( 'mousemove', onMouseMove, false );
 
 			}
-
 
 			// ------------------------------------------------
 			// Event handeling functions
@@ -196,14 +193,14 @@
 			}
 
 			// Handle mouse click events, save the screen position when mouse down
-			function onMouseDown(event) {
-				mouseDown.x = event.clientX;
-				mouseDown.y = event.clientY
+			function onmouse_down(event) {
+				mouse_down.x = event.clientX;
+				mouse_down.y = event.clientY
 			}
 
 			// Handle mouse click events, create a box
 			function onMouseUp(event) {
-				if ((mouseDown.x !== event.clientX) || (mouseDown.y !== event.clientY)) {
+				if ((mouse_down.x !== event.clientX) || (mouse_down.y !== event.clientY)) {
 					// we are dragging, so no nothing
 					return;
 				}
@@ -317,23 +314,6 @@
 				renderer.render( scene, camera );
 			}
 
-
-			// ------------------------------------------------
-			// Helper functions
-			// ------------------------------------------------
-
-			// Get the 3d position from a 2d coordinates in screen space
-			function getMouseClick3DPos(event) {
-				mouseVec.set(
-					( event.clientX / window.innerWidth ) * 2 - 1,
-					- ( event.clientY / window.innerHeight ) * 2 + 1,
-					0	 );
-				mouseVec.unproject( camera );
-				mouseVec.sub( camera.position ).normalize();
-				var distance = - camera.position.z / mouseVec.z;
-				mousePos.copy( camera.position ).add( mouseVec.multiplyScalar( distance ) );
-				return mousePos;
-			}
 
 		</script>
 	</body>
