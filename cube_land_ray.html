@@ -7,6 +7,9 @@
 		<link type="text/css" rel="stylesheet" href="main.css">
 	</head>
 	<body>
+		<div style="color: black; position: absolute; top: 10px; left: 10px"> 
+			Hold shift to delete.
+		</div> 
 		<script type="module">
 
 			// ------------------------------------------------
@@ -24,8 +27,13 @@
 			dirLight, dirLightHeper, dirLightShadowHeper, hemiLight, hemiLightHelper, 
 			raycaster, mouse;
 
-			var box_size = 100;
+			var box_size = 88;
+			var num_cells = Math.round(1000 / box_size)
+			var ground_size = num_cells * box_size;
+			console.log("num cells = ", num_cells);
+
 			var box_geom = new THREE.BoxBufferGeometry( box_size, box_size, box_size );
+			var box_geom_del = new THREE.BoxBufferGeometry( box_size * 1.1, box_size * 1.1, box_size * 1.1 );
 
 			// var box_mat = new THREE.MeshPhongMaterial({
 			// 	color: 0xff0000,
@@ -42,16 +50,16 @@
     			transparent: true,
 			});
 
-			var box_trans;
 
 			var mouse = new THREE.Vector2();
-
 			var mouseDown = new THREE.Vector2();
 			var mouseVec = new THREE.Vector3();
 			var mousePos = new THREE.Vector3();
 
+			var box_trans, box_trans_del;
 			var boxes = {};
-			var pos = null;
+			var box_pos = null;
+			var del_box = false;
 
 			init();
 			animate();
@@ -71,11 +79,21 @@
 
 				// SCENE GRID
 
-				var gridGround = new THREE.GridHelper( 1000, 50, 0x3f3f3f, 0x3f3f3f );
+				var gridGround = new THREE.GridHelper( ground_size, num_cells, 0x3f3f3f, 0x3f3f3f );
 				gridGround.rotation.x = Math.PI / 2;
 				scene.add( gridGround );
 				var axesHelper = new THREE.AxesHelper( 600 );
 				scene.add( axesHelper )
+
+				// GROUND
+
+				var groundGeo = new THREE.PlaneBufferGeometry( ground_size, ground_size );
+				var groundMat = new THREE.MeshLambertMaterial( { color: 0xffffff } );
+				// var groundMat = new THREE.MeshStandardMaterial( { color: 'white' } )
+				groundMat.color.setHSL( 0.095, 1, 0.75 );
+				ground = new THREE.Mesh( groundGeo, groundMat );
+				ground.receiveShadow = true;
+				scene.add( ground );
 
 				// WIREFRAME BOX
 
@@ -84,6 +102,11 @@
 				box_trans.receiveShadow = false;
 				box_trans.visible = false;
 				scene.add(box_trans);
+				box_trans_del = new THREE.Mesh( box_geom_del, box_mat_trans );
+				box_trans_del.castShadow = false;
+				box_trans_del.receiveShadow = false;
+				box_trans_del.visible = false;
+				scene.add(box_trans_del);
 
 				// SCENE BACKGROUND AND FOG
 
@@ -134,16 +157,6 @@
 				dirLightShadowHeper = new THREE.CameraHelper( dirLight.shadow.camera );
 				scene.add( dirLightShadowHeper );
 
-				// GROUND
-
-				var groundGeo = new THREE.PlaneBufferGeometry( 1000, 1000 );
-				var groundMat = new THREE.MeshLambertMaterial( { color: 0xffffff } );
-				// var groundMat = new THREE.MeshStandardMaterial( { color: 'white' } )
-				groundMat.color.setHSL( 0.095, 1, 0.75 );
-				ground = new THREE.Mesh( groundGeo, groundMat );
-				ground.receiveShadow = true;
-				scene.add( ground );
-
 				// RENDERER
 
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
@@ -170,59 +183,6 @@
 
 			}
 
-			// ------------------------------------------------
-			// Animation loop
-			// ------------------------------------------------
-
-			// animation loop
-			function animate() {
-				requestAnimationFrame( animate );
-				render();
-			}
-
-			// render
-			function render() {
-				var isect_objs = Object.values(boxes); 
-				isect_objs.push(ground);
-				if (isect_objs.length > 0) {
-
-					raycaster.setFromCamera( mouse, camera );
-					var intersects = raycaster.intersectObjects( isect_objs );
-
-					if ( intersects.length > 0 ) {
-						var isect0 = intersects[ 0 ];
-						if (isect0.object.name == 'box') {
-							// if this is a box, then get the centre of the box and offset
-							var box_cen = isect0.object.position;
-							pos = new THREE.Vector3(box_cen.x, box_cen.y, box_cen.z);	
-							if (isect0.faceIndex == 0 || isect0.faceIndex == 1) {
-								pos.x += box_size;
-							} else if (isect0.faceIndex == 2 || isect0.faceIndex == 3) {
-								pos.x -= box_size;
-							}  else if (isect0.faceIndex == 4 || isect0.faceIndex == 5) {
-								pos.y += box_size;
-							}  else if (isect0.faceIndex == 6 || isect0.faceIndex == 7) {
-								pos.y -= box_size;
-							}  else if (isect0.faceIndex == 8 || isect0.faceIndex == 9) {
-								pos.z += box_size;
-							}  else if (isect0.faceIndex == 10 || isect0.faceIndex == 11) {
-								pos.z -= box_size;
-							}
-						} else {
-							// if this is the ground, then get the center from intersection of ground mesh
-							pos = new THREE.Vector3();
-							pos.x = Math.round(isect0.point.x / box_size) * box_size;
-							pos.y = Math.round(isect0.point.y / box_size) * box_size;
-							pos.z = box_size / 2;
-						}
-						box_trans.position.set(pos.x, pos.y, pos.z);
-						box_trans.visible = true;
-					} else {
-						box_trans.visible = false;
-					}
-				}
-				renderer.render( scene, camera );
-			}
 
 			// ------------------------------------------------
 			// Event handeling functions
@@ -247,16 +207,16 @@
 					// we are dragging, so no nothing
 					return;
 				}
-				if (pos != null) {
-					var key = pos.x + '_' + pos.y + '_' + pos.z;
-					if (key in boxes) {
+				if (box_pos != null) {
+					var key = box_pos.x + '_' + box_pos.y + '_' + box_pos.z;
+					if (del_box && key in boxes) {
 						scene.remove( boxes[key] );
 						delete boxes[key];
-					} else {
+					} else if (!del_box) {
 						var box = new THREE.Mesh( box_geom, box_mat );
 						box.castShadow = true;
 						box.receiveShadow = true;
-						box.position.set(pos.x, pos.y, pos.z);
+						box.position.set(box_pos.x, box_pos.y, box_pos.z);
 						box.name = "box"
 						scene.add( box );
 						boxes[key] = box;
@@ -264,11 +224,99 @@
 				}
 			}
 
+			// Handle mouse move events
+			// Store the xy location of the mouse position on the screen, as values between 0 and 1
+			// And set the del_box flag and temp box visibility
 			function onMouseMove( event ) {
-				event.preventDefault(); // ???
+				event.preventDefault(); // ??? not too sure what this does
 				mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
 				mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+				if (event.shiftKey) {
+					del_box = true;
+					box_trans.visible = false;
+				} else {
+					del_box = false;
+					box_trans_del.visible = false;
+				}
 			}
+
+			// ------------------------------------------------
+			// Animation loop
+			// ------------------------------------------------
+
+			// animation loop
+			function animate() {
+				requestAnimationFrame( animate );
+				render();
+			}
+
+			// render
+			function render() {
+				var isect_objs = Object.values(boxes); 
+				isect_objs.push(ground);
+				if (isect_objs.length > 0) {
+
+					raycaster.setFromCamera( mouse, camera );
+					var intersects = raycaster.intersectObjects( isect_objs );
+
+					if ( intersects.length > 0 ) {
+						// get the first object that the ray intersects
+						var isect0 = intersects[ 0 ];
+						if (isect0.object.name == 'box') {
+							// if this is a box, then get the centre of the box
+							var box_cen = isect0.object.position;
+							box_pos = new THREE.Vector3(box_cen.x, box_cen.y, box_cen.z);
+							if (!del_box) {
+								// if we are adding a new box, then we offset centre based on the face
+								if (isect0.faceIndex == 0 || isect0.faceIndex == 1) {
+									box_pos.x += box_size;
+								} else if (isect0.faceIndex == 2 || isect0.faceIndex == 3) {
+									box_pos.x -= box_size;
+								}  else if (isect0.faceIndex == 4 || isect0.faceIndex == 5) {
+									box_pos.y += box_size;
+								}  else if (isect0.faceIndex == 6 || isect0.faceIndex == 7) {
+									box_pos.y -= box_size;
+								}  else if (isect0.faceIndex == 8 || isect0.faceIndex == 9) {
+									box_pos.z += box_size;
+								}  else if (isect0.faceIndex == 10 || isect0.faceIndex == 11) {
+									box_pos.z -= box_size;
+								}
+							}
+							if (del_box) {
+								box_trans_del.position.set(box_pos.x, box_pos.y, box_pos.z);
+								box_trans_del.visible = true;
+								box_trans.visible = false;
+							} else {
+								box_trans.position.set(box_pos.x, box_pos.y, box_pos.z);
+								box_trans_del.visible = false;
+								box_trans.visible = true;
+							}
+						} else {
+							// if this is the ground, then get the center from intersection of ground mesh
+							if (!del_box) {
+								box_pos = new THREE.Vector3();
+								if (num_cells % 2 == 1) { // odd number of cells
+									box_pos.x = Math.round(isect0.point.x / box_size) * box_size;
+									box_pos.y = Math.round(isect0.point.y / box_size) * box_size;
+								} else { // even number of cells
+									var half = box_size / 2;
+									box_pos.x = Math.round((half + isect0.point.x) / box_size) * box_size - half;
+									box_pos.y = Math.round((half + isect0.point.y) / box_size) * box_size - half;
+								}
+								box_pos.z = box_size / 2;
+								box_trans.position.set(box_pos.x, box_pos.y, box_pos.z);
+								box_trans_del.visible = false;
+								box_trans.visible = true;
+							}
+						}
+					} else {
+						box_trans.visible = false;
+						box_trans_del.visible = false;
+					}
+				}
+				renderer.render( scene, camera );
+			}
+
 
 			// ------------------------------------------------
 			// Helper functions
