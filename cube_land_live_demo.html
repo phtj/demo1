@@ -30,8 +30,7 @@
 			});
 
 			var mouseDown = new THREE.Vector2();
-			var mouseVec = new THREE.Vector3();
-			var mousePos = new THREE.Vector3();
+			var mouse = new THREE.Vector3();
 
 			var boxes = {}; // boxes["1_2_3"] = box1;
 
@@ -172,6 +171,7 @@
 
 			// Handle mouse click events, create a box
 			function onMouseUp(event) {
+				console.log("========== - ========== - ========== - ==========");
 				// console.log("call onMouseUp", event)
 				if ((mouseDown.x !== event.clientX) || (mouseDown.y !== event.clientY)) {
 					// we are dragging, so no nothing
@@ -188,22 +188,20 @@
 				// create ray and intersect with the scene
 				raycaster.setFromCamera( mouse, camera );
 				var intersects = raycaster.intersectObjects( scene.children );
-				console.log("Intersections", intersects);
+				console.log("Ray intersections with scene objects", intersects);
 
 				// check is we are clicking on nothing
-				if (intersects.length == 0) {
+				if (intersects.length == 0 || intersects[0].object.type != "Mesh") {
 					console.log("clicking on nothing...");
 					return;
 				}
 
 				// cehck the data in the 'intersect' object
 				console.log("point of intersection = ", intersects[0].point);
-				console.log("normal of face that was intersected = ", intersects[0].face.normal);
-				console.log("position of box that was intersected = ", intersects[0].object.position);
-				
+
 				// get the position of the new box
-				var new_box_pos;
-				if (intersects[0].point.z == 0) {
+				var new_box_pos = new THREE.Vector3();
+				if (Math.round(intersects[0].point.z) == 0) {
 					console.log("clicking on ground...");
 					var isect_pos = intersects[0].point;
 					new_box_pos.x = Math.round(isect_pos.x / box_size) * box_size;
@@ -211,10 +209,14 @@
 					new_box_pos.z = (Math.round(isect_pos.z / box_size) * box_size) + box_size / 2;
 				} else {
 					console.log("clicking on another box...");
+					console.log("normal of face that was intersected = ", intersects[0].face.normal);
+					console.log("position of box that was intersected = ", intersects[0].object.position);
 					var exist_box_pos = intersects[0].object.position;
 					var normal  = intersects[0].face.normal;
 					normal.multiplyScalar(box_size);
-					new_box_pos = new THREE.Vector3(exist_box_pos.x, exist_box_pos.y, exist_box_pos.z);
+					new_box_pos.x = exist_box_pos.x;
+					new_box_pos.y = exist_box_pos.y;
+					new_box_pos.z = exist_box_pos.z;
 					new_box_pos.add(normal);
 				}
 
