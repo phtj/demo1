@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+    <head>
+		<meta charset="utf-8">
+		<title>WEEK 3 DIARY ENTRY</title>
+		<style>
+			body { margin: 0; }
+			canvas { display: block; }
+		</style>
+    </head>
+    
+    <body style="background-color:powderblue;">
+        <script src="three.js"></script>
+        <script type="module">
+
+        //--------------------------------------------------
+        // BOX CLICKER
+        //--------------------------------------------------
+
+            //IMPORT SATEMENTS
+
+            import { OrbitControls } from 'https://unpkg.com/three@0.119.1/examples/jsm/controls/OrbitControls.js';
+
+            let camera, scene, renderer, controls;
+            var dirLight, dirLightHeper, dirLightShadowHeper, hemiLight, hemiLightHelper;
+            
+            var width = window.innerWidth * 0.5;
+            var height = window.innerHeight * 0.5;
+
+            //BOX
+            
+            var box_size = 100;
+			var box_geom = new THREE.BoxBufferGeometry( box_size, box_size, box_size );
+			var box_mat = new THREE.MeshPhongMaterial({
+				color: 0xde4b7a,
+                shading: THREE.FlatShading
+            });
+
+            var mouseDown = new THREE.Vector2();
+			var mouse = new THREE.Vector3();
+
+			var boxes = {}; // boxes["1_2_3"] = box1;
+
+            var raycaster = new THREE.Raycaster();
+            
+            init();
+            animate();
+            
+            function init() {
+            
+                //CAMERA AND SCENE
+                
+                scene = new THREE.Scene();
+                camera = new THREE.PerspectiveCamera( 75, width / height, 1, 10000 );
+                camera.up.set( 0, 0, 3 );
+                camera.position.set( 500, 500, 500);
+
+                // SCENE GRID AND AXES
+
+                var gridGround = new THREE.GridHelper( 1000, 100, 0x3f3f3f, 0x3f3f3f );
+                gridGround.rotation.x = Math.PI / 2;
+                scene.add( gridGround );
+                var axesHelper = new THREE.AxesHelper( 500 );
+                scene.add( axesHelper );
+
+                // HEMISPHERE LIGHT
+
+				hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
+				hemiLight.color.setHSL( 0, 1, 0.6 );
+				hemiLight.groundColor.setHSL( 0, 1, 0.75 );
+				hemiLight.position.set( 0, 0, 300 );
+				hemiLight.up.set( 0, 0, 0 );
+                scene.add( hemiLight );
+                
+                //Create a DirectionalLight and turn on shadows for the light
+
+                dirLight = new THREE.DirectionalLight( 0xffffff, 1);
+                dirLight.position.set( -10, -10, 10 ); 			//default; light shining from top
+                dirLight.position.multiplyScalar( 50 );
+                scene.add( dirLight );
+                
+                // DIRECTIONAL LIGHT SHADOWS
+
+                dirLight.castShadow = true;
+                dirLight.shadow.mapSize.width = 2048;
+                dirLight.shadow.mapSize.height = 2048;
+                dirLight.shadow.camera.near = 1;
+                dirLight.shadow.camera.far = 3000;
+                dirLight.shadow.camera.left = -500;
+                dirLight.shadow.camera.bottom = -500;
+                dirLight.shadow.camera.top = 500;
+                dirLight.shadow.camera.right = 500;
+
+                // DIRECTIONAL LIGHT SHADOWS HELPER
+
+                dirLightShadowHeper = new THREE.CameraHelper( dirLight.shadow.camera );
+                scene.add( dirLightShadowHeper );
+
+                // GROUND
+
+                var groundGeo = new THREE.PlaneBufferGeometry( 1000, 1000 );
+                var groundMat = new THREE.MeshLambertMaterial( { color: 0xd99aac } );
+                var ground = new THREE.Mesh( groundGeo, groundMat );
+                ground.receiveShadow = true;
+                scene.add( ground );
+
+                //RENDERER
+                
+                renderer = new THREE.WebGLRenderer( { antialias: true } );
+                renderer.setPixelRatio( window.devicePixelRatio );
+                renderer.setClearColor(0xf7ebf1)
+                renderer.setSize( window.innerWidth*0.5, window.innerHeight*0.5 );
+                document.body.appendChild( renderer.domElement );
+                renderer.shadowMap.enabled =true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap; // default THREE.PCFShadowMap
+
+                // ORBIT CONTROLS
+
+                controls = new OrbitControls( camera, renderer.domElement );
+                controls.target.set( 0, 0, 0 );
+                controls.update();
+                controls.enablePan = true;
+                controls.enableDamping = true;
+
+                // EVENT LISTENERS
+
+				window.addEventListener('resize', onWindowResize, false);
+				document.addEventListener('mousedown', onMouseDown, false);
+				document.addEventListener('mouseup', onMouseUp, false);
+            }
+            
+            //ANIMATION LOOP
+            
+            function animate() {
+            requestAnimationFrame( animate );
+            renderer.render( scene, camera );
+            }
+            
+            // Resize browser window
+			function onWindowResize() {
+                // set width and height
+                // these are used in function onMouseUp(event) {...}
+                width = window.innerWidth * 0.5;
+                height = window.innerHeight * 0.5;
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( width, height );
+			}
+
+			// Handle mouse click events, save the screen position when mouse down
+			function onMouseDown(event) {
+				// console.log("call onMouseDown", event)
+				mouseDown.x = event.clientX;
+				mouseDown.y = event.clientY
+            }
+            
+            // Handle mouse click events, create a box
+			function onMouseUp(event) {
+				console.log("========== - ========== - ========== - ==========");
+				// console.log("call onMouseUp", event)
+				if ((mouseDown.x !== event.clientX) || (mouseDown.y !== event.clientY)) {
+					// we are dragging, so no nothing
+					return;
+				}
+
+				// calculate xy coords of mouse on screen, between [-1, -1] and [1, 1]
+				console.log("mouse screen pixel coords", event.clientX, event.clientY);
+				var mouse = new THREE.Vector2();
+				mouse.x = ( event.clientX / width ) * 2 - 1;
+				mouse.y = - ( event.clientY / height ) * 2 + 1;
+				console.log("mouse screen xy coords", mouse);
+
+				// create ray and intersect with the scene
+				raycaster.setFromCamera( mouse, camera );
+				var intersects = raycaster.intersectObjects( scene.children );
+				console.log("Ray intersections with scene objects", intersects);
+
+				// check is we are clicking on nothing
+				if (intersects.length == 0 || intersects[0].object.type != "Mesh") {
+					console.log("clicking on nothing...");
+					return;
+				}
+
+				// cehck the data in the 'intersect' object
+				console.log("point of intersection = ", intersects[0].point);
+
+				// get the position of the new box
+				var new_box_pos = new THREE.Vector3();
+				if (Math.round(intersects[0].point.z) == 0) {
+					console.log("clicking on ground...");
+					var isect_pos = intersects[0].point;
+					new_box_pos.x = Math.round(isect_pos.x / box_size) * box_size;
+					new_box_pos.y = Math.round(isect_pos.y / box_size) * box_size;
+					new_box_pos.z = (Math.round(isect_pos.z / box_size) * box_size) + box_size / 2;
+				} else {
+					console.log("clicking on another box...");
+					console.log("normal of face that was intersected = ", intersects[0].face.normal);
+					console.log("position of box that was intersected = ", intersects[0].object.position);
+					var exist_box_pos = intersects[0].object.position;
+					var normal  = intersects[0].face.normal;
+					normal.multiplyScalar(box_size);
+					new_box_pos.x = exist_box_pos.x;
+					new_box_pos.y = exist_box_pos.y;
+					new_box_pos.z = exist_box_pos.z;
+					new_box_pos.add(normal);
+				}
+
+				// create the key
+				var key = new_box_pos.x + '_' + new_box_pos.y + '_' + new_box_pos.z;
+
+				// add a box
+				var box = new THREE.Mesh( box_geom, box_mat );
+				box.castShadow = true;
+				box.receiveShadow = true;
+				box.position.x = new_box_pos.x;
+				box.position.y = new_box_pos.y;
+				box.position.z =  new_box_pos.z;
+				scene.add( box );
+				boxes[key] = box;
+
+				// check the collection of boxes
+				console.log("boxes = " , boxes)
+			}
+
+        </script>
+    </body>
+</html>

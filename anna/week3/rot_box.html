@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+    <head>
+		<meta charset="utf-8">
+		<title>WEEK 3 DIARY ENTRY</title>
+		<style>
+			body { margin: 0; }
+			canvas { display: block; }
+		</style>
+    </head>
+    
+    <body style="background-color:powderblue;">
+        <script src="three.js"></script>
+		<script type="module">
+
+        //--------------------------------------------------
+        // ROTATING BOX
+        //--------------------------------------------------
+
+            //IMPORT SATEMENTS
+
+            import { OrbitControls } from 'https://unpkg.com/three@0.119.1/examples/jsm/controls/OrbitControls.js';
+
+
+            //VARIABLES
+
+            let camera, scene, renderer, controls;
+            var dirLight, dirLightHeper, dirLightShadowHeper, hemiLight, hemiLightHelper;
+            var width = window.innerWidth * 1;
+			var height = window.innerHeight * 1;
+
+			//CAMERA AND SCENE
+            
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera( 75, width / height, 1, 1000 );
+            camera.up.set( 0, 0, 3 );
+			camera.position.set( 1, 3, 5);
+
+            // SCENE GRID AND AXES
+
+			var gridGround = new THREE.GridHelper( 10, 25, 0x3f3f3f, 0x3f3f3f );
+			gridGround.rotation.x = Math.PI / 2;
+            gridGround.position.set( 0, 0, 0.01);
+			scene.add( gridGround );
+			var axesHelper = new THREE.AxesHelper( 200 );
+            scene.add( axesHelper );
+
+            // GROUND
+
+            var groundGeo = new THREE.PlaneBufferGeometry( 10, 10 );
+            var groundMat = new THREE.MeshLambertMaterial( { color: 0xd99aac } );
+            var ground = new THREE.Mesh( groundGeo, groundMat );
+            ground.receiveShadow = true;
+            scene.add( ground );
+            
+            //RENDERER
+            
+            renderer = new THREE.WebGLRenderer();
+            renderer.setClearColor(0xf7ebf1)
+            renderer.setSize( window.innerWidth*0.5, window.innerHeight*0.5 );
+            renderer.setPixelRatio( window.devicePixelRatio );
+            document.body.appendChild( renderer.domElement );
+            renderer.shadowMap.enabled =true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // default THREE.PCFShadowMap
+
+            // DIRECTIONAL LIGHT
+
+            dirLight = new THREE.DirectionalLight( 0xffffff, 1, 10 );
+            dirLight.position.set( 10, 0, 100 ); 			//default; light shining from top
+            scene.add( dirLight );
+            
+            // DIRECTIONAL LIGHT SHADOWS
+
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 300;
+            dirLight.shadow.camera.left = -30;
+            dirLight.shadow.camera.bottom = -30;
+            dirLight.shadow.camera.top = 30;
+            dirLight.shadow.camera.right = 30;
+
+            // DIRECTIONAL LIGHT SHADOWS HELPER
+
+            //dirLightShadowHeper = new THREE.CameraHelper( dirLight.shadow.camera );
+            //scene.add( dirLightShadowHeper );
+
+            // ORBIT CONTROLS
+
+			controls = new OrbitControls( camera, renderer.domElement );
+			controls.target.set( 0, 0, 0 );
+			controls.update();
+			// controls.enablePan = true;
+			// controls.enableDamping = true;
+
+            //BOX
+
+            var texture = new THREE.TextureLoader().load( 'HIMAWARI.jpg' );
+            var geometry = new THREE.BoxGeometry(2.2,2.2,2.2);
+            var material = new THREE.MeshBasicMaterial( { map: texture } );
+            var cube = new THREE.Mesh( geometry, material );
+            cube.position.set(0,0,2)
+            cube.castShadow = true;
+            scene.add( cube );
+            
+            // EVENT LISTENERS
+
+            window.addEventListener( 'resize', onWindowResize, false );
+
+            //ANIMATION LOOP
+
+            animate();
+            
+            function animate() {
+                requestAnimationFrame( animate );
+                cube.rotation.x += 0.01;
+                cube.rotation.y += 0.01;
+                renderer.render( scene, camera );
+            }
+            
+            // Resize browser window
+			function onWindowResize() {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth*0.5, window.innerHeight*0.5 );
+			}
+
+        </script>
+    </body>
+</html>
