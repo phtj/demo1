@@ -41,6 +41,7 @@
 			var mouse = new THREE.Vector3();
 
 			var boxes = {}; // boxes["1_2_3"] = box1;
+            var ground;
 
             var raycaster = new THREE.Raycaster();
             
@@ -101,7 +102,7 @@
 
                 var groundGeo = new THREE.PlaneBufferGeometry( 1000, 1000 );
                 var groundMat = new THREE.MeshLambertMaterial( { color: 0xd99aac } );
-                var ground = new THREE.Mesh( groundGeo, groundMat );
+                ground = new THREE.Mesh( groundGeo, groundMat );
                 ground.receiveShadow = true;
                 scene.add( ground );
 
@@ -173,7 +174,9 @@
 
 				// create ray and intersect with the scene
 				raycaster.setFromCamera( mouse, camera );
-				var intersects = raycaster.intersectObjects( scene.children );
+                var objs = Object.values(boxes);
+                objs.push(ground);
+				var intersects = raycaster.intersectObjects( objs );
 				console.log("Ray intersections with scene objects", intersects);
 
 				// check is we are clicking on nothing
