@@ -59,7 +59,7 @@
 
 			var camera, scene, renderer, ground,
 			dir_light, dir_light_helper, dir_lightShadowHeper, hemi_light, hemi_light_helper, 
-			raycaster, mouse, box_trans, box_trans_del, container;
+			raycaster, box_trans, box_trans_del, container;
 
 			// box and canvas
 			var box_size = 88;
@@ -84,6 +84,7 @@
 
 			// mouse
 			var mouse = new THREE.Vector2();
+			var mouse_is_down = false;
 			var mouse_down = new THREE.Vector2();
 
 			// box settings
@@ -233,6 +234,7 @@
 
 			// Handle mouse click events, save the screen position when mouse down
 			function onMouseDown(event) {
+				mouse_is_down = true;
 				mouse_down.x = event.clientX;
 				mouse_down.y = event.clientY
 			}
@@ -240,7 +242,8 @@
 			// Handle mouse click events, 
 			// Either create a box or delete box
 			function onMouseUp(event) {
-				if ((mouse_down.x !== event.clientX) || (mouse_down.y !== event.clientY)) {
+				mouse_is_down = false;
+				if ((Math.abs(mouse_down.x - event.clientX) > 10) || (Math.abs(mouse_down.y - event.clientY) > 10)) {
 					// we are dragging, so no nothing
 					return;
 				}
@@ -285,11 +288,24 @@
 			// animation loop
 			function animate() {
 				requestAnimationFrame( animate );
-				render();
+				if (mouse_is_down) {
+					// if we are rotating the view (holding down the mouse), we dont want a glass box
+					renderRotateView();
+				} else {
+					// if we are not rotating, then generate a glass box where the mouse is
+					renderGenerateGlassBox();
+				}
 			}
 
-			// render
-			function render() {
+			// render rotate view, do not draw a glass box
+			function renderRotateView() {
+				box_trans.visible = false;
+				box_trans_del.visible = false;
+				renderer.render( scene, camera );
+			}
+
+			// render ray intersect and draw a glass box
+			function renderGenerateGlassBox() {
 				// get the object in teh scene to check for intersections
 				// the boxes and the ground
 				var isect_objs = Object.values(boxes); 
@@ -356,7 +372,6 @@
 					box_trans.visible = false;
 					box_trans_del.visible = false;
 				}
-				// render the scene
 				renderer.render( scene, camera );
 			}
 
