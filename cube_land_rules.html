@@ -34,15 +34,7 @@
 		</style>
 	</head>
 	<body>
-		<h1>This is a test.</h1>
-		<p> Some text...</p>
-		<p> Some text...</p>
-		<p> Some text...</p>
-		<p> Some text...</p>
-		<p> Some text...</p>
-		<p> Some text...</p>
-		<p> Some text...</p>
-		<p> Some text...</p>
+		<h1>Rules...</h1>
 		<div id="container"></div>
 		<script type="module">
 
@@ -61,11 +53,14 @@
 			dir_light, dir_light_helper, dir_lightShadowHeper, hemi_light, hemi_light_helper, 
 			raycaster, box_trans, box_trans_del, container;
 
-			// box and canvas
+			// box
 			var box_size = 88;
 			var box_size_half = box_size / 2;
 			var box_geom = new THREE.BoxBufferGeometry( box_size, box_size, box_size );
 			var box_geom_del = new THREE.BoxBufferGeometry( box_size * 1.1, box_size * 1.1, box_size * 1.1 );
+
+			// sphere
+			var sphere_geom = new THREE.SphereBufferGeometry( box_size/2, box_size/2, box_size/2 );
 
 			// ground
 			var num_cells = Math.round(1000 / box_size)
@@ -79,6 +74,10 @@
 			var box_mat_trans = new THREE.MeshLambertMaterial( {
 				color: 'white',
 				opacity: 0.3,
+    			transparent: true,
+			});
+			var box_mat_invisible = new THREE.MeshLambertMaterial( {
+				opacity: 0,
     			transparent: true,
 			});
 
@@ -248,20 +247,42 @@
 					return;
 				}
 				if (box_pos != null) {
-					var key = box_pos.x / box_size_half + '_' + box_pos.y  / box_size_half + '_' + box_pos.z / box_size_half;
-					// var key = box_pos.x + '_' + box_pos.y  + '_' + box_pos.z;
-					// console.log("key = ", key);
+					var coords = new THREE.Vector3(
+							Math.round(box_pos.x / box_size_half),
+							Math.round(box_pos.y / box_size_half),
+							Math.round(box_pos.z / box_size_half)
+					);
+					var key = coords.x + '_' + coords.y + '_' + coords.z;
 					if (del_box && key in boxes) {
+						var neighbours = getNeighbours(boxes[key]);
+						// delete
 						scene.remove( boxes[key] );
 						delete boxes[key];
+						// update neighbours
+						update(neighbours);
 					} else if (!del_box) {
-						var box = new THREE.Mesh( box_geom, box_mat );
-						box.castShadow = true;
-						box.receiveShadow = true;
-						box.position.set(box_pos.x, box_pos.y, box_pos.z);
-						box.name = "box"
-						scene.add( box );
-						boxes[key] = box;
+						// an invisible box used for ray intersection
+						var cell = new THREE.Mesh( box_geom, box_mat_invisible );
+						cell.castShadow = false;
+						cell.receiveShadow = false;
+						cell.position.set(box_pos.x, box_pos.y, box_pos.z);
+						cell.coords = coords
+						cell.name = "box";
+						cell.shape = "sphere";
+						// a visible sphere
+						var sphere = new THREE.Mesh( sphere_geom, box_mat );
+						sphere.castShadow = true;
+						sphere.receiveShadow = true;
+						sphere.name = "sphere";
+						// add
+						scene.add( cell );
+						cell.add( sphere );
+						boxes[key] = cell;
+						// update neighbours
+						var neighbours = getNeighbours(cell);
+						console.log('neighbours', neighbours);
+						neighbours.push(cell);
+						update(neighbours);
 					}
 				}
 			}
@@ -313,6 +334,7 @@
 				// create a ray from the camera and intersect it with objects in the scene
 				raycaster.setFromCamera( mouse, camera );
 				var intersects = raycaster.intersectObjects( isect_objs );
+				// console.log(intersects);
 
 				if ( intersects.length > 0 ) {
 					// get the first object that the ray intersects
@@ -395,6 +417,66 @@
 
 				// console.log("mouse. x y", mouse.x, mouse.y);
 			}
+
+			// Get all the neighbours of a box
+			// 6 neighbours
+			// up, down, north, south, east, west
+			function getNeighbours(box) {
+				var coords = box.coords;
+				var u = boxes[coords.x + '_' + coords.y + '_' + (coords.z + 2)];
+				var d = boxes[coords.x + '_' + coords.y + '_' + (coords.z - 2)];
+				var n = boxes[coords.x + '_' + (coords.y + 2) + '_' + coords.z];
+				var s = boxes[coords.x + '_' + (coords.y - 2) + '_' + coords.z];
+				var e = boxes[(coords.x + 2) + '_' + coords.y + '_' + coords.z]; 
+				var w = boxes[(coords.x - 2) + '_' + coords.y + '_' + coords.z];
+				console.log('[coords.x coords.y (coords.z - 2)]', coords.x + '_' + coords.y + '_' + (coords.z - 2));
+				var neighbours = [];
+				console.log('[u, d, n, s, e, w]', [u, d, n, s, e, w], coords, boxes);
+				for (var neighbour of [u, d, n, s, e, w]) {
+					if (neighbour != undefined) { neighbours.push(neighbour); }
+				}
+				return neighbours;
+			}
+
+			function update(cells) {
+				for (var cell of cells) {
+					var coords = cell.coords;
+					var above = boxes[coords.x + '_' + coords.y + '_' + (coords.z + 2)];
+					var below = boxes[coords.x + '_' + coords.y + '_' + (coords.z - 2)];
+					// RULES
+					if (above == undefined && below != undefined && cell.shape == 'box') {
+						switchToSphere(cell);
+					} else if ((above != undefined || below == undefined) && cell.shape == 'sphere') {
+						switchToBox(cell);
+					}
+				}
+			}
+
+			function switchToSphere(cell) {
+				console.log('switchToSphere');
+				scene.remove(cell.children[0]);
+				// a visible sphere
+				var sphere = new THREE.Mesh( sphere_geom, box_mat );
+				sphere.castShadow = true;
+				sphere.receiveShadow = true;
+				sphere.name = "sphere";
+				cell.add(sphere);
+				cell.shape == 'sphere';
+			}
+
+			function switchToBox(cell) {
+				console.log('switchToBox');
+				scene.remove(cell.children[0]);
+				// a visible sphere
+				var box = new THREE.Mesh( box_geom, box_mat );
+				box.castShadow = true;
+				box.receiveShadow = true;
+				box.name = "sphere";
+				cell.add(box);
+				cell.shape == 'box';
+			}
+
+
 
 		</script>
 	</body>
