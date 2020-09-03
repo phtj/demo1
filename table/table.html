@@ -108,7 +108,7 @@
             setRowData(table_id, 0, [,"col", "col2", "col3", "col4", "xx"]);
             setCellData(table_id, 1, 1, "hello");
             setCellData(table_id, 1, 2, 123);
-            setCellData(table_id, 1, 3, {value: 234, type: TYPE.INPUT});
+            setCellData(table_id, 1, 3, {value: 234, type: TYPE.INPUT, append: "m"});
             setCellData(table_id, 1, 4, {value: 0, formula: "= C2 + D2"});
             setCellData(table_id, 1, 5, {value: 55.00, prepend: "$", append:" /m2"});
             createTable(table_id);
