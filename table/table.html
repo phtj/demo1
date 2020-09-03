@@ -310,7 +310,7 @@
                 return [table_id, row, col];
             }
 
-            // set teh data for all cells in a row
+            // set the data for all cells in a row
             function setRowData(table_id, row_num, new_row_data) {
                 for (var j = 0; j < new_row_data.length; j++) {
                     if (new_row_data[j] != undefined) {
@@ -352,7 +352,7 @@
                 cell_data.td_elem.innerHTML = cell_display_formula;
             }
 
-            // display teh value in the cell
+            // display the value in the cell
             function displayCellValue(id, row_num, col_num) {
                 var cell_data = DATA[id][row_num][col_num];
                 var cell_display_val;
@@ -368,7 +368,7 @@
                 }
             }
 
-            // split the id used in td elements and input elements into three integers
+            // split the id used in td elements and input elements into a string and two integers
             function splitId(id) {
                 var [table_id, row, col] = id.split('_');
                 row = parseInt(row);
