@@ -97,7 +97,6 @@
             // each cell is an object
             // to get data you do DATA[table_id][row_index][col_index]
             var DATA = {};
-            console.log("DATA = ", DATA);
 
             // ids of tables in order they appear in teh web page
             var table_ids = ['table1', 'table2', 'table3'];
@@ -126,7 +125,15 @@
             table_id = table_ids[2];
             initTableData(table_id, 4, 6);
             setRowData(table_id, 0, [,"p", "q", "r", "s", "t"]);
-            setCellData(table_id, 1, 2, 33);
+            setCellDataByA1(table_id, "B4", 33);
+            setCellDataByA1(table_id, "C2", {value: 0, formula: "= B4"});
+            setCellDataByA1(table_id, "C4", {value: 0, formula: "= C2 * 2"});
+            setCellDataByA1(table_id, "D2", {value: 0, formula: "= C4"});
+            setCellDataByA1(table_id, "D4", {value: 0, formula: "= D2 * 2"});
+            setCellDataByA1(table_id, "E2", {value: 0, formula: "= D4"});
+            setCellDataByA1(table_id, "E4", {value: 0, formula: "= E2 * 2"});
+            setCellDataByA1(table_id, "F2", {value: 0, formula: "= E4"});
+            setCellDataByA1(table_id, "F4", {value: 0, formula: "= F2 * 2"});
             createTable(table_id);
 
             // Compute all values first time
@@ -136,6 +143,7 @@
 			// Helper functions
             // ------------------------------------------------
             
+            // create the array data for one table
             function initTableData(table_id, num_rows, num_cols) {
                 DATA[table_id] = [];
                 var table_data = DATA[table_id];
@@ -150,12 +158,15 @@
                                 prepend: "", 
                                 append: "", 
                                 type: TYPE.VALUE, 
-                                td_elem: null
+                                td_elem: null,
+                                evaluated: false
                             };
                     }
                 }
             }
 
+            // create one html table
+            // also creates the event listeners for the cells
             function createTable(table_id) {
                 var table = document.getElementById(table_id);
                 var table_data = DATA[table_id];
@@ -205,46 +216,90 @@
                 }
             }
 
+            // compute all values for all cells
             function computeAll(start_table_id) {
                 // we only need to update tables that are below this table in the web page
                 var start_table_idx = table_ids.indexOf(start_table_id);
+                // reset all the evaluated flags to false
                 for (var table_idx = start_table_idx; table_idx < table_ids.length; table_idx++) {
                     var table_id = table_ids[table_idx];
-                    // get the table
                     var table_data = DATA[table_id];
-                    // loop through all cells in the table and update the ones of type=formula
                     for (var i = 0; i < table_data.length; i++) {
                         var row = table_data[i]
                         for (var j = 0; j < row.length; j++) {
-                            var cell_data = table_data[i][j];
-                            if (cell_data.type == TYPE.FORMULA) {
-                                var parsed_formula = parseFomula(table_id, cell_data.formula);
-                                var new_val = eval(parsed_formula);
-                                table_data[i][j].value = new_val;
-                                displayCellValue(table_id, i, j);
-                            }
+                            table_data[i][j].evaluated = false;
+                        }
+                    }
+                }
+                // now calc all the formulas
+                for (var table_idx = start_table_idx; table_idx < table_ids.length; table_idx++) {
+                    var table_id = table_ids[table_idx];
+                    var table_data = DATA[table_id];
+                    for (var i = 0; i < table_data.length; i++) {
+                        var row = table_data[i]
+                        for (var j = 0; j < row.length; j++) {
+                            var new_val = evalFomula(table_id, i, j);
                         }
                     }
                 }
             }
 
+            // evaluate teh formula in a cell and write the data to the array
+            // and also update the display of the cell to show teh result
+            // this function is recursive
+            // it will call all other cells in the formula first
+            function evalFomula(table_id, row, col) {
+                var cell_data = DATA[table_id][row][col];
+                // if no formula, return
+                if (cell_data.type != TYPE.FORMULA) {
+                    return;
+                }
+                // if formula already computed, return
+                if (cell_data.evaluated == true) {
+                    return;
+                }
+                var formula = cell_data.formula;
+                var [parsed_formula, cell_indexes] = parseFomula(table_id, formula)
+                // now we want to check if any cell that we are going to read from has a formula
+                // if there is a formula we should evaluate that formula first
+                for (var [table_id2, row2, col2] of cell_indexes) {
+                    evalFomula(table_id2, row2, col2);
+                }
+                // now we can actually eval the main formula
+                var new_val = eval(parsed_formula);
+                cell_data.value = new_val;
+                displayCellValue(table_id, row, col);
+                // set the flag so that this formula is not recomputed
+                cell_data.evaluated = true;
+            }
+
+            // convert the formula into something that can be eval()
+            // also returnes the indexes of any cells referred to in the formula
             function parseFomula(table_id, formula) {
                 var parts = formula.split(" ");
                 var new_parts = [];
+                var cell_indexes = [];
                 for (var part of parts) {
                     if (part == '=') {
                         // pass
-                    } else if (['=', '+', '-', '*'].indexOf(part) != -1) {
+                    } else if (['+', '-', '*'].indexOf(part) != -1) {
                         new_parts.push(part);
+                    } else if (isNaN(part.slice(0, 1))) {
+                        // save the indexes to the cell
+                        var [table_id2, row2, col2] = parseCellRef(table_id, part);
+                        cell_indexes.push([table_id2, row2, col2]);
+                        // create the parsed cell ref
+                        var parsed_cell_ref = "DATA['" + table_id2 + "'][" + row2 + "][" + col2 + "].value";
+                        new_parts.push(parsed_cell_ref);
                     } else {
-                        new_parts.push(parseCellRef(table_id, part));
+                        new_parts.push(part); // assume this is a float
                     }
                 }
-                return new_parts.join(' ');
+                return [new_parts.join(' '), cell_indexes];
             }
             
+            // convert teh cell ref, e.g.  table1!C7 to DATA['table1'][6][2]
             function parseCellRef(table_id, cell_ref) {
-                // converts table1!C7 to DATA['table1'][6][2]
                 var parts = cell_ref.split("!");
                 if (parts.length > 1) {
                     table_id = parts[0];
@@ -252,19 +307,21 @@
                 }
                 var row = parseInt(cell_ref.slice(1)) - 1;
                 var col = cell_ref.slice(0, 1).charCodeAt(0)  - CHAR_A;
-                return "DATA['" + table_id + "'][" + row + "][" + col + "].value";
+                return [table_id, row, col];
             }
 
-            function setRowData(id, row_num, new_row_data) {
+            // set teh data for all cells in a row
+            function setRowData(table_id, row_num, new_row_data) {
                 for (var j = 0; j < new_row_data.length; j++) {
                     if (new_row_data[j] != undefined) {
-                        setCellData(id, row_num, j, new_row_data[j]);
+                        setCellData(table_id, row_num, j, new_row_data[j]);
                     }
                 }
             }
 
-            function setCellData(id, row_num, col_num, new_cell_data) {
-                var cell_data = DATA[id][row_num][col_num];
+            // set cell by array indexes, starting at 0
+            function setCellData(table_id, row_num, col_num, new_cell_data) {
+                var cell_data = DATA[table_id][row_num][col_num];
                 if (typeof new_cell_data === 'string' || typeof new_cell_data === 'number') {
                     cell_data.value = new_cell_data;
                 } else {
@@ -277,10 +334,13 @@
                 }
             }
 
-            function getCellData(id, row_num, col_num) {
-                return DATA[id][row_num][col_num];
+            // set cell by alpha numeric indexes, starting at A1
+            function setCellDataByA1(table_id, cell_ref, new_cell_data) {
+                var  [table_id2, row2, col2] = parseCellRef(table_id, cell_ref);
+                setCellData(table_id, row2, col2, new_cell_data);
             }
 
+            // display the formula in the cell
             function displayCellFormula(id, row_num, col_num) {
                 var cell_data = DATA[id][row_num][col_num];
                 var cell_display_formula;
@@ -292,6 +352,7 @@
                 cell_data.td_elem.innerHTML = cell_display_formula;
             }
 
+            // display teh value in the cell
             function displayCellValue(id, row_num, col_num) {
                 var cell_data = DATA[id][row_num][col_num];
                 var cell_display_val;
@@ -307,22 +368,7 @@
                 }
             }
 
-            // function displayTable(id) {
-            //     var table_data = DATA[id];
-            //     for (var i = 0; i < table_data.length; i++) {
-            //         var row = table_data[i]
-            //         for (var j = 0; j < row.length; j++) {
-            //             displayCellValue(id, i, j);
-            //         }
-            //     }
-            // }
-
-            // function displayAllTables() {
-            //     for (var id in DATA) {
-            //         displayTable(id);
-            //     }
-            // }
-
+            // split the id used in td elements and input elements into three integers
             function splitId(id) {
                 var [table_id, row, col] = id.split('_');
                 row = parseInt(row);
