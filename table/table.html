@@ -125,7 +125,7 @@
             table_id = table_ids[2];
             initTableData(table_id, 4, 6);
             setRowData(table_id, 0, [,"p", "q", "r", "s", "t"]);
-            setCellDataByA1(table_id, "B4", 33);
+            setCellDataByA1(table_id, "B4", {value: 0, formula: "= table1!D2"});
             setCellDataByA1(table_id, "C2", {value: 0, formula: "= B4"});
             setCellDataByA1(table_id, "C4", {value: 0, formula: "= C2 * 2"});
             setCellDataByA1(table_id, "D2", {value: 0, formula: "= C4"});
