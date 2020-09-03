@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+        <title>Tables</title>
+        <link rel="icon" href="data:,">
+		<meta charset="utf-8">
+		<style>
+            body {
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: 12px;
+			}
+            li {
+                list-style: none;
+            }
+            li:before {
+                content: "✓ ";
+            }
+
+            input {
+                margin: 1px;
+                border: 1px solid #999;
+                width: 80px;
+                padding: 2px;
+            }
+
+            input:hover {
+                background-color: #eee;
+            }
+
+            input:focus {
+                background-color: #ccf;
+            }
+
+            input:not(:focus) {
+                text-align: right;
+            }
+
+            table {
+                border-collapse: collapse; 
+                margin: 20px;
+            }
+
+            td {
+                text-align: right;
+                border: 1px solid #999;
+                width: 80px;
+                height: 20px;
+                padding: 2px;
+            }
+            td.formula {
+                background-color: rgb(224, 208, 208);
+            }
+            td.value {
+                background-color: rgb(121, 199, 76);
+            }
+            td.input {
+                background-color: rgb(110, 57, 233);
+            }
+            td.empty {
+                background-color: rgb(238, 240, 219);
+            }
+
+            tr:first-child td, td:first-child {
+                background-color: #ccc;
+                padding: 1px 3px;
+                font-weight: bold;
+                text-align: center;
+            }
+
+		</style>
+	</head>
+
+	<body>
+        <p> Table 1</p>
+        <table id="table1"></table>
+        <p> Table 2</p>
+        <table id="table2"></table>
+        <p> Table 3</p>
+        <table id="table3"></table>
+
+		<script type="module">
+
+            // cell types
+            var TYPE = {
+                EMPTY: "empty",
+                VALUE: "value",
+                FORMULA: "formula",
+                INPUT: "input"
+            }
+
+            // The char number of the column A
+            var CHAR_A = "A".charCodeAt(0);
+
+            // The data for all the tables 
+            // each table has an ID
+            // the data for the table is an array of row arrays
+            // each cell is an object
+            // to get data you do DATA[table_id][row_index][col_index]
+            var DATA = {};
+            console.log("DATA = ", DATA);
+
+            // ids of tables in order they appear in teh web page
+            var table_ids = ['table1', 'table2', 'table3'];
+            var table_id;
+
+            // Create table 1
+            table_id = table_ids[0];
+            initTableData(table_id, 4, 6);
+            setRowData(table_id, 0, [,"col", "col2", "col3", "col4", "xx"]);
+            setCellData(table_id, 1, 1, "hello");
+            setCellData(table_id, 1, 2, 123);
+            setCellData(table_id, 1, 3, {value: 234, type: TYPE.INPUT});
+            setCellData(table_id, 1, 4, {value: 0, formula: "= C2 + D2"});
+            setCellData(table_id, 1, 5, {value: 55.00, prepend: "$", append:" /m2"});
+            createTable(table_id);
+
+            // Create table 2
+            table_id = table_ids[1];
+            initTableData(table_id, 4, 6);
+            setRowData(table_id, 0, [,"aaa", "bbb", "ccc", "ddd", "eee"]);
+            setCellData(table_id, 1, 2, 22);
+            setCellData(table_id, 1, 3, {value: 0, formula: "= table1!D2"});
+            createTable(table_id);
+
+            // Create table 3
+            table_id = table_ids[2];
+            initTableData(table_id, 4, 6);
+            setRowData(table_id, 0, [,"p", "q", "r", "s", "t"]);
+            setCellData(table_id, 1, 2, 33);
+            createTable(table_id);
+
+            // Compute all values first time
+            computeAll(table_ids[0]);
+
+			// ------------------------------------------------
+			// Helper functions
+            // ------------------------------------------------
+            
+            function initTableData(table_id, num_rows, num_cols) {
+                DATA[table_id] = [];
+                var table_data = DATA[table_id];
+                for (var i = 0; i < num_rows; i++) {
+                    table_data[i] = [];
+                    for (var j = 0; j < num_cols; j++) {
+                        table_data[i][j] = 
+                            {
+                                index: [i, j], 
+                                value: null, 
+                                formula: null, 
+                                prepend: "", 
+                                append: "", 
+                                type: TYPE.VALUE, 
+                                td_elem: null
+                            };
+                    }
+                }
+            }
+
+            function createTable(table_id) {
+                var table = document.getElementById(table_id);
+                var table_data = DATA[table_id];
+                for (var i = 0; i < table_data.length; i++) {
+                    // create the row
+                    var row_data = table_data[i];
+                    var row_elem = table.insertRow(-1);
+                    for (var j = 0; j < row_data.length; j++) {
+                        // cerate the cell
+                        var cell_data = row_data[j];
+                        var td_elem = row_elem.insertCell(-1);
+                        td_elem.classList.add(cell_data.type);
+                        cell_data.td_elem = td_elem;
+                        // add event listeners
+                        if (cell_data.type == TYPE.INPUT) {
+                            // create input elem for cell
+                            var input_elem = document.createElement("input");
+                            td_elem.appendChild(input_elem);
+                            // create an id for the input
+                            input_elem.id =  table_id + '_' + i + '_' +  j;
+                            // event listener for onblur
+                            input_elem.onblur = function(e) {
+                                var [_table_id, _row, _col] = splitId(e.target.id);
+                                DATA[_table_id][_row][_col].value = parseFloat(e.target.value);
+                                // update display of cell value
+                                displayCellValue(_table_id, _row, _col);
+                                // recalc all dependent values
+                                computeAll(table_id);
+                            };
+                        } else if (cell_data.type == TYPE.FORMULA) {
+                            // if we hover we want to see the formula (for debugging only)
+                            // create an id for the td element
+                            td_elem.id =  table_id + '_' + i + '_' +  j;
+                            // event listener for onfocus
+                            td_elem.onmouseenter = function(e) {
+                                var [_table_id, _row, _col] = splitId(e.target.id);
+                                displayCellFormula(_table_id, _row, _col);
+                            };
+                            // event listener for onblur
+                            td_elem.onmouseleave = function(e) {
+                                var [_table_id, _row, _col] = splitId(e.target.id);
+                                displayCellValue(_table_id, _row, _col);
+                            };
+                        }
+                        displayCellValue(table_id, i, j);
+                    }
+                }
+            }
+
+            function computeAll(start_table_id) {
+                // we only need to update tables that are below this table in the web page
+                var start_table_idx = table_ids.indexOf(start_table_id);
+                for (var table_idx = start_table_idx; table_idx < table_ids.length; table_idx++) {
+                    var table_id = table_ids[table_idx];
+                    // get the table
+                    var table_data = DATA[table_id];
+                    // loop through all cells in the table and update the ones of type=formula
+                    for (var i = 0; i < table_data.length; i++) {
+                        var row = table_data[i]
+                        for (var j = 0; j < row.length; j++) {
+                            var cell_data = table_data[i][j];
+                            if (cell_data.type == TYPE.FORMULA) {
+                                var parsed_formula = parseFomula(table_id, cell_data.formula);
+                                var new_val = eval(parsed_formula);
+                                table_data[i][j].value = new_val;
+                                displayCellValue(table_id, i, j);
+                            }
+                        }
+                    }
+                }
+            }
+
+            function parseFomula(table_id, formula) {
+                var parts = formula.split(" ");
+                var new_parts = [];
+                for (var part of parts) {
+                    if (part == '=') {
+                        // pass
+                    } else if (['=', '+', '-', '*'].indexOf(part) != -1) {
+                        new_parts.push(part);
+                    } else {
+                        new_parts.push(parseCellRef(table_id, part));
+                    }
+                }
+                return new_parts.join(' ');
+            }
+            
+            function parseCellRef(table_id, cell_ref) {
+                // converts table1!C7 to DATA['table1'][6][2]
+                var parts = cell_ref.split("!");
+                if (parts.length > 1) {
+                    table_id = parts[0];
+                    cell_ref = parts[1];
+                }
+                var row = parseInt(cell_ref.slice(1)) - 1;
+                var col = cell_ref.slice(0, 1).charCodeAt(0)  - CHAR_A;
+                return "DATA['" + table_id + "'][" + row + "][" + col + "].value";
+            }
+
+            function setRowData(id, row_num, new_row_data) {
+                for (var j = 0; j < new_row_data.length; j++) {
+                    if (new_row_data[j] != undefined) {
+                        setCellData(id, row_num, j, new_row_data[j]);
+                    }
+                }
+            }
+
+            function setCellData(id, row_num, col_num, new_cell_data) {
+                var cell_data = DATA[id][row_num][col_num];
+                if (typeof new_cell_data === 'string' || typeof new_cell_data === 'number') {
+                    cell_data.value = new_cell_data;
+                } else {
+                    for (var key in new_cell_data) {
+                        cell_data[key] = new_cell_data[key];
+                        if (key == TYPE.FORMULA) {
+                            cell_data.type = TYPE.FORMULA;
+                        }
+                    }
+                }
+            }
+
+            function getCellData(id, row_num, col_num) {
+                return DATA[id][row_num][col_num];
+            }
+
+            function displayCellFormula(id, row_num, col_num) {
+                var cell_data = DATA[id][row_num][col_num];
+                var cell_display_formula;
+                if (cell_data.formula != undefined && cell_data.formula != null) {
+                    cell_display_formula = cell_data.formula;
+                } else {
+                    cell_display_formula = '';
+                }
+                cell_data.td_elem.innerHTML = cell_display_formula;
+            }
+
+            function displayCellValue(id, row_num, col_num) {
+                var cell_data = DATA[id][row_num][col_num];
+                var cell_display_val;
+                if (cell_data.value != undefined && cell_data.value != null) {
+                    cell_display_val = cell_data.prepend + cell_data.value + cell_data.append;
+                } else {
+                    cell_display_val = '';
+                }
+                if (cell_data.type != TYPE.INPUT) {
+                    cell_data.td_elem.innerHTML = cell_display_val;
+                } else {
+                    cell_data.td_elem.firstChild.value = cell_display_val;
+                }
+            }
+
+            // function displayTable(id) {
+            //     var table_data = DATA[id];
+            //     for (var i = 0; i < table_data.length; i++) {
+            //         var row = table_data[i]
+            //         for (var j = 0; j < row.length; j++) {
+            //             displayCellValue(id, i, j);
+            //         }
+            //     }
+            // }
+
+            // function displayAllTables() {
+            //     for (var id in DATA) {
+            //         displayTable(id);
+            //     }
+            // }
+
+            function splitId(id) {
+                var [table_id, row, col] = id.split('_');
+                row = parseInt(row);
+                col = parseInt(col);
+                return [table_id, row, col];
+            }
+
+		</script>
+
+	</body>
+
+</html>
