@@ -2,8 +2,8 @@
 <html lang="en">
 	<head>
 		<title>Cube Land</title>
+		<link rel="icon" href="data:,">
 		<meta charset="utf-8">
-		<!-- <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"> -->
 		<style>
 			body {
 				text-align: center;
@@ -19,7 +19,7 @@
 				display: block;
 				margin: auto;
 				padding: 0px;
-                width: 50%;
+                width: 90%;
 				height: 500px;
 				border: 3px solid black;
 			}
@@ -82,14 +82,14 @@
 			});
 
 			// mouse
-			var mouse = new THREE.Vector2();
-			var mouse_is_down = false;
-			var mouse_down = new THREE.Vector2();
+			var mouse_xy = new THREE.Vector2(); // the coordinates of the mouse between [-1, -1] and [1,1]
+			var mouse_is_down = false; // true when you hold the mouse button down
+			var mouse_down = new THREE.Vector2(); // the pixel coords of where of the mouse down event
 
 			// box settings
-			var boxes = {};
-			var box_pos = null;
-			var del_box = false;
+			var cells_dict = {}; // each cell has a key, e.g. "1_3_5", and the value is the cell object
+			var next_cell_pos = null; // store the position where the next cell will be created or deleted
+			var del_cell = false; // is true, a cell will be deleted, if false a cell will be created
 
 			init();
 			animate();
@@ -246,58 +246,34 @@
 					// we are dragging, so no nothing
 					return;
 				}
-				if (box_pos != null) {
+				if (next_cell_pos != null) {
 					var coords = new THREE.Vector3(
-							Math.round(box_pos.x / box_size_half),
-							Math.round(box_pos.y / box_size_half),
-							Math.round(box_pos.z / box_size_half)
+							Math.round(next_cell_pos.x / box_size_half),
+							Math.round(next_cell_pos.y / box_size_half),
+							Math.round(next_cell_pos.z / box_size_half)
 					);
 					var key = coords.x + '_' + coords.y + '_' + coords.z;
-					if (del_box && key in boxes) {
-						var neighbours = getNeighbours(boxes[key]);
-						// delete
-						scene.remove( boxes[key] );
-						delete boxes[key];
-						// update neighbours
-						update(neighbours);
-					} else if (!del_box) {
-						// an invisible box used for ray intersection
-						var cell = new THREE.Mesh( box_geom, box_mat_invisible );
-						cell.castShadow = false;
-						cell.receiveShadow = false;
-						cell.position.set(box_pos.x, box_pos.y, box_pos.z);
-						cell.coords = coords
-						cell.name = "box";
-						cell.shape = "sphere";
-						// a visible sphere
-						var sphere = new THREE.Mesh( sphere_geom, box_mat );
-						sphere.castShadow = true;
-						sphere.receiveShadow = true;
-						sphere.name = "sphere";
-						// add
-						scene.add( cell );
-						cell.add( sphere );
-						boxes[key] = cell;
-						// update neighbours
-						var neighbours = getNeighbours(cell);
-						console.log('neighbours', neighbours);
-						neighbours.push(cell);
-						update(neighbours);
+					if (del_cell && key in cells_dict) {
+						// delete an existing cell
+						removeCell( key );
+					} else if (!del_cell) {
+						// add a new cell
+						addCell( key, coords );
 					}
 				}
 			}
 
 			// Handle mouse move events
 			// Store the xy location of the mouse position on the screen, as values between 0 and 1
-			// And set the del_box flag and temp box visibility
+			// And set the del_cell flag and temp box visibility
 			function onMouseMove( event ) {
 				event.preventDefault(); // ??? not too sure what this does
 				saveMouseCoords(event);
 				if (event.shiftKey) {
-					del_box = true;
+					del_cell = true;
 					box_trans.visible = false;
 				} else {
-					del_box = false;
+					del_cell = false;
 					box_trans_del.visible = false;
 				}
 			}
@@ -328,69 +304,69 @@
 			// render ray intersect and draw a glass box
 			function renderGenerateGlassBox() {
 				// get the object in teh scene to check for intersections
-				// the boxes and the ground
-				var isect_objs = Object.values(boxes); 
+				// the cells_dict and the ground
+				var isect_objs = Object.values(cells_dict); 
 				isect_objs.push(ground);
 				// create a ray from the camera and intersect it with objects in the scene
-				raycaster.setFromCamera( mouse, camera );
+				raycaster.setFromCamera( mouse_xy, camera );
 				var intersects = raycaster.intersectObjects( isect_objs );
 				// console.log(intersects);
 
 				if ( intersects.length > 0 ) {
 					// get the first object that the ray intersects
 					var isect0 = intersects[ 0 ];
-					if (isect0.object.name == 'box') {
+					if (isect0.object.name == 'cell') {
 						// if this is a box, then get the centre of the box
-						var box_cen = isect0.object.position;
-						box_pos = new THREE.Vector3(box_cen.x, box_cen.y, box_cen.z);
-						if (!del_box) {
+						var cell_cen = isect0.object.position;
+						next_cell_pos = new THREE.Vector3(cell_cen.x, cell_cen.y, cell_cen.z);
+						if (!del_cell) {
 							// if we are adding a new box, then we offset centre based on the face that was intersected
 							if (isect0.faceIndex == 0 || isect0.faceIndex == 1) {
-								box_pos.x += box_size;
+								next_cell_pos.x += box_size;
 							} else if (isect0.faceIndex == 2 || isect0.faceIndex == 3) {
-								box_pos.x -= box_size;
+								next_cell_pos.x -= box_size;
 							}  else if (isect0.faceIndex == 4 || isect0.faceIndex == 5) {
-								box_pos.y += box_size;
+								next_cell_pos.y += box_size;
 							}  else if (isect0.faceIndex == 6 || isect0.faceIndex == 7) {
-								box_pos.y -= box_size;
+								next_cell_pos.y -= box_size;
 							}  else if (isect0.faceIndex == 8 || isect0.faceIndex == 9) {
-								box_pos.z += box_size;
+								next_cell_pos.z += box_size;
 							}  else if (isect0.faceIndex == 10 || isect0.faceIndex == 11) {
-								box_pos.z -= box_size;
+								next_cell_pos.z -= box_size;
 							}
 						}
-						if (del_box) {
+						if (del_cell) {
 							// show 'delete' glass box
-							box_trans_del.position.set(box_pos.x, box_pos.y, box_pos.z);
+							box_trans_del.position.set(next_cell_pos.x, next_cell_pos.y, next_cell_pos.z);
 							box_trans_del.visible = true;
 							box_trans.visible = false;
 						} else {
 							// show 'add' glass box
-							box_trans.position.set(box_pos.x, box_pos.y, box_pos.z);
+							box_trans.position.set(next_cell_pos.x, next_cell_pos.y, next_cell_pos.z);
 							box_trans_del.visible = false;
 							box_trans.visible = true;
 						}
 					} else {
 						// if this is the ground, then get the center from intersection of ground mesh
-						if (!del_box) {
-							box_pos = new THREE.Vector3();
+						if (!del_cell) {
+							next_cell_pos = new THREE.Vector3();
 							if (num_cells % 2 == 1) { // odd number of cells
-								box_pos.x = Math.round(isect0.point.x / box_size) * box_size;
-								box_pos.y = Math.round(isect0.point.y / box_size) * box_size;
+								next_cell_pos.x = Math.round(isect0.point.x / box_size) * box_size;
+								next_cell_pos.y = Math.round(isect0.point.y / box_size) * box_size;
 							} else { // even number of cells
-								box_pos.x = Math.round((box_size_half + isect0.point.x) / box_size) * box_size - box_size_half;
-								box_pos.y = Math.round((box_size_half + isect0.point.y) / box_size) * box_size - box_size_half;
+								next_cell_pos.x = Math.round((box_size_half + isect0.point.x) / box_size) * box_size - box_size_half;
+								next_cell_pos.y = Math.round((box_size_half + isect0.point.y) / box_size) * box_size - box_size_half;
 							}
 							// show 'add' glass box
-							box_pos.z = box_size_half;
-							box_trans.position.set(box_pos.x, box_pos.y, box_pos.z);
+							next_cell_pos.z = box_size_half;
+							box_trans.position.set(next_cell_pos.x, next_cell_pos.y, next_cell_pos.z);
 							box_trans_del.visible = false;
 							box_trans.visible = true;
 						}
 					}
 				} else {
 					// the ray intersects with nothing
-					// hide the glass boxes
+					// hide the glass cells
 					box_trans.visible = false;
 					box_trans_del.visible = false;
 				}
@@ -402,81 +378,131 @@
 			// ------------------------------------------------
 
 			// Get the coords of the mouse on the whole page, 
-			// and convert it into xy coords relative to the div container
+			// and convert it into xy coords relative to the centre of the div container
+			// the coords should be [-1, -1] in the bottom left corner of the div
+			// and [1, 1] in the top right corner of the div
 			function saveMouseCoords(event) {
 				// https://stackoverflow.com/questions/14651306/get-mouse-position-within-div
-
-				// console.log("event .clientX .clientY", event.clientX , event.clientY);
-				// console.log("event .pageX .pageY", event.pageX , event.pageY);
-				// console.log("container .offsetLeft .offsetTop", container.offsetLeft, container.offsetTop);
-				// console.log("container .clientWidth .clientHeight", container.clientWidth, container.clientHeight);
-				// console.log("container .offsetWidth .offsetHeight", container.offsetWidth, container.offsetHeight);
-
-				mouse.x = ( (event.pageX - container.offsetLeft ) / container.clientWidth ) * 2 - 1;
-				mouse.y = - ( (event.pageY - container.offsetTop) / container.clientHeight ) * 2 + 1;
-
-				// console.log("mouse. x y", mouse.x, mouse.y);
+				mouse_xy.x = ( (event.pageX - container.offsetLeft ) / container.clientWidth ) * 2 - 1;
+				mouse_xy.y = - ( (event.pageY - container.offsetTop) / container.clientHeight ) * 2 + 1;
 			}
 
-			// Get all the neighbours of a box
-			// 6 neighbours
-			// up, down, north, south, east, west
-			function getNeighbours(box) {
-				var coords = box.coords;
-				var u = boxes[coords.x + '_' + coords.y + '_' + (coords.z + 2)];
-				var d = boxes[coords.x + '_' + coords.y + '_' + (coords.z - 2)];
-				var n = boxes[coords.x + '_' + (coords.y + 2) + '_' + coords.z];
-				var s = boxes[coords.x + '_' + (coords.y - 2) + '_' + coords.z];
-				var e = boxes[(coords.x + 2) + '_' + coords.y + '_' + coords.z]; 
-				var w = boxes[(coords.x - 2) + '_' + coords.y + '_' + coords.z];
-				console.log('[coords.x coords.y (coords.z - 2)]', coords.x + '_' + coords.y + '_' + (coords.z - 2));
-				var neighbours = [];
-				console.log('[u, d, n, s, e, w]', [u, d, n, s, e, w], coords, boxes);
-				for (var neighbour of [u, d, n, s, e, w]) {
-					if (neighbour != undefined) { neighbours.push(neighbour); }
+			// Get a dictionary of neighbour keys
+			// Lets say the coords are [1,3,5], then the key of the cell will be 1_3_5
+			// The neighbour keys will be as follows:
+			// up     = 1_3_7
+			// down   = 1_3_3
+			// north  = 1_5_5
+			// south  = 1_1_5
+			// east   = 3_3_5
+			// west   = -1_3_5
+			function getNeighbourKeys( coords ) {
+				var u = coords.x + '_' + coords.y + '_' + (coords.z + 2);
+				var d = coords.x + '_' + coords.y + '_' + (coords.z - 2);
+				var n = coords.x + '_' + (coords.y + 2) + '_' + coords.z;
+				var s = coords.x + '_' + (coords.y - 2) + '_' + coords.z;
+				var e = (coords.x + 2) + '_' + coords.y + '_' + coords.z; 
+				var w = (coords.x - 2) + '_' + coords.y + '_' + coords.z;
+				return {u, d, n, s, e, w};
+			}
+
+			// Get all the neighbour cells of a cell
+			function getNeighbours( cell ) {
+				return Object.values(cell.neighbours).map(key => cells_dict[key]).filter( nei => nei != undefined );
+			}
+
+			// switch a cell to be a sphere
+			function makeCellSphere( cell ) {
+				// console.log('switchToSphere');
+				if (cell.children.length > 0) {
+					if ( cell.shape == 'sphere') { return; }
+					scene.remove(cell.children[0]);
 				}
-				return neighbours;
-			}
-
-			function update(cells) {
-				for (var cell of cells) {
-					var coords = cell.coords;
-					var above = boxes[coords.x + '_' + coords.y + '_' + (coords.z + 2)];
-					var below = boxes[coords.x + '_' + coords.y + '_' + (coords.z - 2)];
-					// RULES
-					if (above == undefined && below != undefined && cell.shape == 'box') {
-						switchToSphere(cell);
-					} else if ((above != undefined || below == undefined) && cell.shape == 'sphere') {
-						switchToBox(cell);
-					}
-				}
-			}
-
-			function switchToSphere(cell) {
-				console.log('switchToSphere');
-				scene.remove(cell.children[0]);
 				// a visible sphere
 				var sphere = new THREE.Mesh( sphere_geom, box_mat );
 				sphere.castShadow = true;
 				sphere.receiveShadow = true;
-				sphere.name = "sphere";
 				cell.add(sphere);
-				cell.shape == 'sphere';
+				cell.shape = 'sphere';
 			}
 
-			function switchToBox(cell) {
-				console.log('switchToBox');
-				scene.remove(cell.children[0]);
+			// switch a cell to be a box
+			function makeCellBox( cell ) {
+				// console.log('switchToBox');
+				if (cell.children.length > 0) {
+					if ( cell.shape == 'box') { return; }
+					scene.remove(cell.children[0]);
+				}
 				// a visible sphere
 				var box = new THREE.Mesh( box_geom, box_mat );
 				box.castShadow = true;
 				box.receiveShadow = true;
-				box.name = "sphere";
 				cell.add(box);
-				cell.shape == 'box';
+				cell.shape = 'box';
 			}
 
+			// add a new cell
+			function addCell( key, coords ) {
+				// an invisible box used for ray intersection
+				var cell = new THREE.Mesh( box_geom, box_mat_invisible );
+				cell.castShadow = false;
+				cell.receiveShadow = false;
+				cell.position.set(next_cell_pos.x, next_cell_pos.y, next_cell_pos.z);
+				cell.name = "cell";
+				// add custom properties: neighbours, coords
+				cell.neighbours = getNeighbourKeys( coords );
+				cell.coords = coords;
+				makeCellSphere( cell );
+				// add to the scene and the cells_dict dictionary
+				scene.add( cell );
+				cells_dict[key] = cell;
+				// update neighbours
+				var neighbours = getNeighbours( cell );
+				neighbours.push(cell);
+				update(neighbours);
+			}
 
+			// remove an existing cell
+			function removeCell( key ) {
+				var neighbours = getNeighbours(cells_dict[key]);
+				// delete
+				scene.remove( cells_dict[key] );
+				delete cells_dict[key];
+				// update neighbours
+				update(neighbours);
+			}
+
+			// updates the cells in the list
+			// for each cell, check the neighbours above and below and applies some simpel rules
+			function update( cells ) {
+				for (var cell of cells) {
+					// get the cells above and below
+					var cell_up = cells_dict[cell.neighbours.u];
+					var cell_down = cells_dict[cell.neighbours.d];
+
+
+					// ========== RULES ========
+					// -------------------------
+					// RULE above is empty, below is occupied -> sphere
+					if (cell_up == undefined && cell_down != undefined) {
+						makeCellSphere(cell);
+					} else 
+					// -------------------------
+					// RULE above is empty, cell is on ground -> sphere
+					if (cell_up == undefined && cell.coords.z == 1) {
+						makeCellSphere(cell);
+					} else 
+					// -------------------------
+					// RULE above is occupied, below is empty -> box
+					if (cell_up != undefined || cell_down == undefined) {
+						makeCellBox(cell);
+					}
+					// -------------------------
+					// ========== RULES ========
+
+
+				}
+			}
 
 		</script>
 	</body>
