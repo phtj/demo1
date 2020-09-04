@@ -34,7 +34,7 @@
 		</style>
 	</head>
 	<body>
-		<h1>Rules...</h1>
+		<h1>Trees...</h1>
 		<div id="container"></div>
 		<script type="module">
 
@@ -44,6 +44,7 @@
 
 			import * as THREE from 'https://unpkg.com/three@0.119.1/build/three.module.js';
 			import { OrbitControls } from 'https://unpkg.com/three@0.119.1/examples/jsm/controls/OrbitControls.js';
+			import { GLTFLoader } from 'https://unpkg.com/three@0.119.1/examples/jsm/loaders/GLTFLoader.js';
 
 			// ------------------------------------------------
 			// Main code
@@ -60,18 +61,19 @@
 			var box_geom_del = new THREE.BoxBufferGeometry( box_size * 1.1, box_size * 1.1, box_size * 1.1 );
 
 			// sphere
-			var sphere_geom = new THREE.SphereBufferGeometry( box_size/1.9, 24, 24 );
+			var sphere_geom = new THREE.SphereBufferGeometry( box_size/2, 24, 24 );
+
+			// gltf loader
+			var loader = new GLTFLoader();
 
 			// ground
 			var num_cells = Math.round(1000 / box_size)
 			var ground_size = num_cells * box_size;
 
 			// materials
-			var blue_mat = new THREE.MeshLambertMaterial( {
+			var box_mat = new THREE.MeshLambertMaterial( {
 				color: 'blue',
-			});
-			var green_mat = new THREE.MeshLambertMaterial( {
-				color: 'green',
+
 			});
 			var box_mat_trans = new THREE.MeshLambertMaterial( {
 				color: 'white',
@@ -134,7 +136,7 @@
 				ground.receiveShadow = true;
 				scene.add( ground );
 
-				// WIREFRAME BOX
+				// GLASS BOX
 
 				box_trans = new THREE.Mesh( box_geom, box_mat_trans );
 				box_trans.castShadow = false;
@@ -418,13 +420,13 @@
 
 			// switch a cell to be a sphere
 			function makeCellSphere( cell ) {
+				console.log("SPH", cell);
 				// console.log('switchToSphere');
 				if (cell.children.length > 0) {
 					if ( cell.shape == 'sphere') { return; }
-					disposeObject(cell, cell.children[0]);
+					cell.children.forEach( child => cell.remove(child) );
 				}
-				// a visible sphere
-				var sphere = new THREE.Mesh( sphere_geom, green_mat );
+				var sphere = new THREE.Mesh( sphere_geom, box_mat );
 				sphere.castShadow = true;
 				sphere.receiveShadow = true;
 				cell.add(sphere);
@@ -433,17 +435,41 @@
 
 			// switch a cell to be a box
 			function makeCellBox( cell ) {
+				console.log("BOX", cell);
 				// console.log('switchToBox');
 				if (cell.children.length > 0) {
 					if ( cell.shape == 'box') { return; }
-					disposeObject(cell, cell.children[0]);
+					cell.children.forEach( child => cell.remove(child) );
 				}
-				// a visible sphere
-				var box = new THREE.Mesh( box_geom, blue_mat );
+				var box = new THREE.Mesh( box_geom, box_mat );
 				box.castShadow = true;
 				box.receiveShadow = true;
 				cell.add(box);
 				cell.shape = 'box';
+			}
+
+			// switch a cell to be a tree
+			function makeCellTree( cell ) {
+				console.log("TREE", cell);
+				// console.log('switchToTree');
+				if (cell.children.length > 0) {
+					if ( cell.shape == 'tree') { return; }
+					cell.children.forEach( child => cell.remove(child) );
+				}
+				// https://threejs.org/docs/#examples/en/loaders/GLTFLoader
+				loader.load( 'tree.glb', 
+					function loadGltf( gltf ) {
+						console.log("loadGltf...");
+						var model = gltf.scene;
+						console.log("gltf model", model);
+						var scale = 25;
+						model.position.set( 0, 0, scale );
+						model.scale.set( scale , scale, scale);
+						model.rotation.x = Math.PI / 2;
+						cell.add( model );
+						cell.shape = 'tree';
+					}, undefined, function(e){ console.error( e ); } 
+				);
 			}
 
 			// add a new cell
@@ -457,7 +483,7 @@
 				// add custom properties: neighbours, coords
 				cell.neighbours = getNeighbourKeys( coords );
 				cell.coords = coords;
-				makeCellSphere( cell );
+				makeCellTree( cell );
 				// add to the scene and the cells_dict dictionary
 				scene.add( cell );
 				cells_dict[key] = cell;
@@ -471,17 +497,10 @@
 			function removeCell( key ) {
 				var neighbours = getNeighbours(cells_dict[key]);
 				// delete
-				disposeObject( scene, cells_dict[key] );
+				scene.remove( cells_dict[key] );
 				delete cells_dict[key];
 				// update neighbours
 				update(neighbours);
-			}
-
-			// clear mem and removes object from scene
-			function disposeObject(parent, obj) {
-				obj.geometry.dispose();
-				obj.material.dispose();
-				parent.remove( obj );
 			}
 
 			// updates the cells in the list
@@ -500,9 +519,9 @@
 						makeCellSphere(cell);
 					} else 
 					// -------------------------
-					// RULE above is empty, cell is on ground -> sphere
+					// RULE above is empty, cell is on ground -> tree
 					if (cell_up == undefined && cell.coords.z == 1) {
-						makeCellSphere(cell);
+						makeCellTree(cell);
 					} else 
 					// -------------------------
 					// RULE above is occupied, below is empty -> box
