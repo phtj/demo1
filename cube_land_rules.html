@@ -60,13 +60,13 @@
 			var box_geom_del = new THREE.BoxBufferGeometry( box_size * 1.1, box_size * 1.1, box_size * 1.1 );
 
 			// sphere
-			var sphere_geom = new THREE.SphereBufferGeometry( box_size/2, box_size/2, box_size/2 );
+			var sphere_geom = new THREE.SphereBufferGeometry( box_size/2, 24, 24 );
 
 			// ground
 			var num_cells = Math.round(1000 / box_size)
 			var ground_size = num_cells * box_size;
 
-			//materials
+			// materials
 			var box_mat = new THREE.MeshLambertMaterial( {
 				color: 'blue',
 
@@ -106,7 +106,7 @@
 
 				// CAMERA AND SCENE
 
-				camera = new THREE.PerspectiveCamera( 70, container.clientWidth / container.clientHeight, 1, 10000 );
+				camera = new THREE.PerspectiveCamera( 55, container.clientWidth / container.clientHeight, 1, 10000 );
 				camera.position.set( 500, 500, 500 );
 				camera.up.set( 0, 0, 1 );
 				scene = new THREE.Scene();
@@ -116,8 +116,11 @@
 				var gridGround = new THREE.GridHelper( ground_size, num_cells, 0x3f3f3f, 0x3f3f3f );
 				gridGround.rotation.x = Math.PI / 2;
 				scene.add( gridGround );
-				var axesHelper = new THREE.AxesHelper( 600 );
-				scene.add( axesHelper )
+
+				// AXIS HELPER
+
+				// var axesHelper = new THREE.AxesHelper( 600 );
+				// scene.add( axesHelper )
 
 				// GROUND
 
@@ -158,8 +161,8 @@
 
 				// HEMISPHERE LIGHT HELPER
 
-				hemi_light_helper = new THREE.HemisphereLightHelper( hemi_light, 100 );
-				scene.add( hemi_light_helper );
+				// hemi_light_helper = new THREE.HemisphereLightHelper( hemi_light, 100 );
+				// scene.add( hemi_light_helper );
 
 				// DIRECTIONAL LIGHT
 
@@ -171,8 +174,8 @@
 
 				// DIRECTIONAL LIGHT HELPER
 
-				dir_light_helper = new THREE.DirectionalLightHelper( dir_light, 100 );
-				scene.add( dir_light_helper );
+				// dir_light_helper = new THREE.DirectionalLightHelper( dir_light, 100 );
+				// scene.add( dir_light_helper );
 
 				// DIRECTIONAL LIGHT SHADOWS
 
@@ -188,8 +191,8 @@
 
 				// DIRECTIONAL LIGHT SHADOWS HELPER
 
-				dir_lightShadowHeper = new THREE.CameraHelper( dir_light.shadow.camera );
-				scene.add( dir_lightShadowHeper );
+				// dir_lightShadowHeper = new THREE.CameraHelper( dir_light.shadow.camera );
+				// scene.add( dir_lightShadowHeper );
 
 				// RENDERER
 
