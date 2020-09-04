@@ -420,11 +420,11 @@
 
 			// switch a cell to be a sphere
 			function makeCellSphere( cell ) {
-				console.log("SPH", cell);
+				// console.log("SPH", cell);
 				// console.log('switchToSphere');
 				if (cell.children.length > 0) {
 					if ( cell.shape == 'sphere') { return; }
-					cell.children.forEach( child => cell.remove(child) );
+					cell.children.forEach( child => deleteEntity(cell, child) );
 				}
 				var sphere = new THREE.Mesh( sphere_geom, box_mat );
 				sphere.castShadow = true;
@@ -435,11 +435,11 @@
 
 			// switch a cell to be a box
 			function makeCellBox( cell ) {
-				console.log("BOX", cell);
+				// console.log("BOX", cell);
 				// console.log('switchToBox');
 				if (cell.children.length > 0) {
 					if ( cell.shape == 'box') { return; }
-					cell.children.forEach( child => cell.remove(child) );
+					cell.children.forEach( child => deleteEntity(cell, child) );
 				}
 				var box = new THREE.Mesh( box_geom, box_mat );
 				box.castShadow = true;
@@ -450,18 +450,18 @@
 
 			// switch a cell to be a tree
 			function makeCellTree( cell ) {
-				console.log("TREE", cell);
+				// console.log("TREE", cell);
 				// console.log('switchToTree');
 				if (cell.children.length > 0) {
 					if ( cell.shape == 'tree') { return; }
-					cell.children.forEach( child => cell.remove(child) );
+					cell.children.forEach( child => deleteEntity(cell, child) );
 				}
 				// https://threejs.org/docs/#examples/en/loaders/GLTFLoader
 				loader.load( 'tree.glb', 
 					function loadGltf( gltf ) {
-						console.log("loadGltf...");
+						// console.log("loadGltf...");
 						var model = gltf.scene;
-						console.log("gltf model", model);
+						// console.log("gltf model", model);
 						var scale = 25;
 						model.position.set( 0, 0, scale );
 						model.scale.set( scale , scale, scale);
@@ -483,7 +483,7 @@
 				// add custom properties: neighbours, coords
 				cell.neighbours = getNeighbourKeys( coords );
 				cell.coords = coords;
-				makeCellTree( cell );
+				makeCellBox( cell );
 				// add to the scene and the cells_dict dictionary
 				scene.add( cell );
 				cells_dict[key] = cell;
@@ -497,10 +497,25 @@
 			function removeCell( key ) {
 				var neighbours = getNeighbours(cells_dict[key]);
 				// delete
-				scene.remove( cells_dict[key] );
+				deleteEntity( scene, cells_dict[key] );
 				delete cells_dict[key];
 				// update neighbours
 				update(neighbours);
+			}
+
+			// removes entity from scene
+			function deleteEntity(parent, entity) {
+				parent.remove( entity );
+				disposeEntity( entity );
+			}
+
+			// dispose entity, clear mem and 
+			function disposeEntity(entity) {
+				if ('children' in entity) {
+					entity.children.forEach( child => disposeEntity(child) );
+				}
+				if ('geometry' in entity) { entity.geometry.dispose() };
+				if ('material' in entity) { entity.material.dispose() };
 			}
 
 			// updates the cells in the list

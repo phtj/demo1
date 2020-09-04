@@ -479,9 +479,9 @@
 
 			// clear mem and removes object from scene
 			function disposeObject(parent, obj) {
+				parent.remove( obj );
 				obj.geometry.dispose();
 				obj.material.dispose();
-				parent.remove( obj );
 			}
 
 			// updates the cells in the list
