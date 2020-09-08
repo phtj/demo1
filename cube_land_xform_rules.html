@@ -431,9 +431,7 @@
 					if ( cell.shape == 'box') { return; }
 					disposeObject(cell, cell.children[0]);
 				}
-				var box = new THREE.Mesh( 
-					new THREE.BoxBufferGeometry( box_size * 0.95, box_size * 0.95, box_size * 0.95 ), 
-					new THREE.MeshLambertMaterial() );
+				var box = new THREE.Mesh( box_geom, new THREE.MeshLambertMaterial() );
 				box.castShadow = true;
 				box.receiveShadow = true;
 				cell.add(box);
