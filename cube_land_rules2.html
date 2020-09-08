@@ -441,15 +441,18 @@
 
 			// change the colour of a cell
 			function changeColour( obj, colour ) {
+				// https://threejs.org/docs/#api/en/materials/MeshLambertMaterial.color
+				// https://threejs.org/docs/#api/en/materials/MeshPhongMaterial.color
+				// https://threejs.org/docs/#api/en/math/Color.set
+				if (obj.material != undefined) {
+					obj.material.color.set( colour );
+				}
+				// change colour of any child objects
 				if (obj.children.length > 0) {
 					for (const child of obj.children) {
 						changeColour(child, colour);
 					}
 				}
-				// https://threejs.org/docs/#api/en/materials/MeshLambertMaterial.color
-				// https://threejs.org/docs/#api/en/materials/MeshPhongMaterial.color
-				// https://threejs.org/docs/#api/en/math/Color.set
-				obj.material.color.set( colour );
 			}
 
 			// add a new cell
