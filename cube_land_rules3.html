@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Cube Land</title>
+		<link rel="icon" href="data:,">
+		<meta charset="utf-8">
+		<style>
+			body {
+				text-align: center;
+				font-family: Arial, Helvetica, sans-serif;
+			}
+			h1 {
+				font-size: 30px;
+			}
+			p {
+				font-size: 20px;
+			}
+			#container {
+				display: block;
+				margin: auto;
+				padding: 0px;
+                width: 90%;
+				height: 500px;
+				border: 3px solid black;
+			}
+			canvas {
+				display: block;
+				margin: 0px;
+				padding: 0px;
+				outline: none; 
+				border: none;
+				cursor: crosshair;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Xform Rules...</h1>
+		<div id="container"></div>
+		<script type="module">
+
+			// ------------------------------------------------
+			// Import statements
+			// ------------------------------------------------
+
+			import * as THREE from 'https://unpkg.com/three@0.119.1/build/three.module.js';
+			import { OrbitControls } from 'https://unpkg.com/three@0.119.1/examples/jsm/controls/OrbitControls.js';
+
+			// ------------------------------------------------
+			// Main code
+			// ------------------------------------------------
+
+			var camera, scene, renderer, ground,
+			dir_light, dir_light_helper, dir_lightShadowHeper, hemi_light, hemi_light_helper, 
+			raycaster, box_trans, box_trans_del, container;
+
+			// box
+			var box_size = 88;
+			var box_size_half = box_size / 2;
+			var box_geom = new THREE.BoxBufferGeometry( box_size * 0.95, box_size * 0.95, box_size * 0.95 );
+			var box_geom_del = new THREE.BoxBufferGeometry( box_size * 1.1, box_size * 1.1, box_size * 1.1 );
+
+			// sphere
+			var sphere_geom = new THREE.SphereBufferGeometry( box_size/1.9, 24, 24 );
+
+			// ground
+			var num_cells = Math.round(1000 / box_size)
+			var ground_size = num_cells * box_size;
+
+			// materials
+			var box_mat_trans = new THREE.MeshLambertMaterial( {
+				color: 'white',
+				opacity: 0.3,
+    			transparent: true,
+			});
+			var box_mat_invisible = new THREE.MeshLambertMaterial( {
+				opacity: 0,
+    			transparent: true,
+			});
+
+			// mouse
+			var mouse_xy = new THREE.Vector2(); // the coordinates of the mouse between [-1, -1] and [1,1]
+			var mouse_is_down = false; // true when you hold the mouse button down
+			var mouse_down = new THREE.Vector2(); // the pixel coords of where of the mouse down event
+
+			// box settings
+			var cells_dict = {}; // each cell has a key, e.g. "1_3_5", and the value is the cell object
+			var next_cell_pos = null; // store the position where the next cell will be created or deleted
+			var del_cell = false; // is true, a cell will be deleted, if false a cell will be created
+
+			init();
+			animate();
+
+			// ------------------------------------------------
+			// Initialization function
+			// ------------------------------------------------
+
+			function init() {
+
+				// GET CONTAINER
+
+				container = document.getElementById("container");
+
+				// CAMERA AND SCENE
+
+				camera = new THREE.PerspectiveCamera( 55, container.clientWidth / container.clientHeight, 1, 10000 );
+				camera.position.set( 500, 500, 500 );
+				camera.up.set( 0, 0, 1 );
+				scene = new THREE.Scene();
+
+				// SCENE GRID
+
+				var gridGround = new THREE.GridHelper( ground_size, num_cells, 0x3f3f3f, 0x3f3f3f );
+				gridGround.rotation.x = Math.PI / 2;
+				scene.add( gridGround );
+
+				// AXIS HELPER
+
+				// var axesHelper = new THREE.AxesHelper( 600 );
+				// scene.add( axesHelper )
+
+				// GROUND
+
+				var ground_geo = new THREE.PlaneBufferGeometry( ground_size, ground_size );
+				var ground_mat = new THREE.MeshLambertMaterial( { color: 0xffffff } );
+				// var ground_mat = new THREE.MeshStandardMaterial( { color: 'white' } )
+				ground_mat.color.setHSL( 0.095, 1, 0.75 );
+				ground = new THREE.Mesh( ground_geo, ground_mat );
+				ground.receiveShadow = true;
+				scene.add( ground );
+
+				// WIREFRAME BOX
+
+				box_trans = new THREE.Mesh( box_geom, box_mat_trans );
+				box_trans.castShadow = false;
+				box_trans.receiveShadow = false;
+				box_trans.visible = false;
+				scene.add(box_trans);
+				box_trans_del = new THREE.Mesh( box_geom_del, box_mat_trans );
+				box_trans_del.castShadow = false;
+				box_trans_del.receiveShadow = false;
+				box_trans_del.visible = false;
+				scene.add(box_trans_del);
+
+				// SCENE BACKGROUND AND FOG
+
+				scene.background = new THREE.Color().setHSL( 0.6, 0, 1 );
+				scene.fog = new THREE.Fog( scene.background, 1, 7000 );
+
+				// HEMISPHERE LIGHT
+
+				hemi_light = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
+				hemi_light.color.setHSL( 0.6, 1, 0.6 );
+				hemi_light.groundColor.setHSL( 0.095, 1, 0.75 );
+				hemi_light.position.set( 0, 0, 300 );
+				hemi_light.up.set( 0, 0, 0 );
+				scene.add( hemi_light );
+
+				// HEMISPHERE LIGHT HELPER
+
+				// hemi_light_helper = new THREE.HemisphereLightHelper( hemi_light, 100 );
+				// scene.add( hemi_light_helper );
+
+				// DIRECTIONAL LIGHT
+
+				dir_light = new THREE.DirectionalLight( 0xffffff, 1 );
+				dir_light.color.setHSL( 0.1, 1, 0.95 );
+				dir_light.position.set( -0.9, -0.8, 1.1 );
+				dir_light.position.multiplyScalar( 1000 );
+				scene.add( dir_light );
+
+				// DIRECTIONAL LIGHT HELPER
+
+				// dir_light_helper = new THREE.DirectionalLightHelper( dir_light, 100 );
+				// scene.add( dir_light_helper );
+
+				// DIRECTIONAL LIGHT SHADOWS
+
+				dir_light.castShadow = true;
+				dir_light.shadow.mapSize.width = 2048;
+				dir_light.shadow.mapSize.height = 2048;
+				dir_light.shadow.camera.near = 1;
+				dir_light.shadow.camera.far = 3000;
+				dir_light.shadow.camera.left = -500;
+				dir_light.shadow.camera.bottom = -500;
+				dir_light.shadow.camera.top = 500;
+				dir_light.shadow.camera.right = 500;
+
+				// DIRECTIONAL LIGHT SHADOWS HELPER
+
+				// dir_lightShadowHeper = new THREE.CameraHelper( dir_light.shadow.camera );
+				// scene.add( dir_lightShadowHeper );
+
+				// RENDERER
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( container.clientWidth, container.clientHeight );
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap; // default THREE.PCFShadowMap
+
+				// ADD RENDERER TO CONTAINER
+
+				container.appendChild( renderer.domElement );
+				
+				// ORBIT CONTROL
+
+				var controls = new OrbitControls( camera, renderer.domElement );
+
+				// RAYCASTER
+
+				raycaster = new THREE.Raycaster();
+
+				// EVENT LISTENERS
+
+				window.addEventListener( 'resize', onWindowResize, false );
+				document.addEventListener('mousedown', onMouseDown, false);
+				document.addEventListener('mouseup', onMouseUp, false);
+				document.addEventListener( 'mousemove', onMouseMove, false );
+
+			}
+
+			// ------------------------------------------------
+			// Event handeling functions
+			// ------------------------------------------------
+
+			// Resize browser window
+			function onWindowResize() {
+				camera.aspect = container.clientWidth / container.clientHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( container.clientWidth, container.clientHeight );
+			}
+
+			// Handle mouse click events, save the screen position when mouse down
+			function onMouseDown(event) {
+				mouse_is_down = true;
+				mouse_down.x = event.clientX;
+				mouse_down.y = event.clientY
+			}
+
+			// Handle mouse click events, 
+			// Either create a box or delete box
+			function onMouseUp(event) {
+				mouse_is_down = false;
+				if ((Math.abs(mouse_down.x - event.clientX) > 10) || (Math.abs(mouse_down.y - event.clientY) > 10)) {
+					// we are dragging, so no nothing
+					return;
+				}
+				if (next_cell_pos != null) {
+					var coords = new THREE.Vector3(
+							Math.round(next_cell_pos.x / box_size_half),
+							Math.round(next_cell_pos.y / box_size_half),
+							Math.round(next_cell_pos.z / box_size_half)
+					);
+					var key = coords.x + '_' + coords.y + '_' + coords.z;
+					if (del_cell && key in cells_dict) {
+						// delete an existing cell
+						removeCell( key );
+					} else if (!del_cell) {
+						// add a new cell
+						addCell( key, coords );
+					}
+				}
+			}
+
+			// Handle mouse move events
+			// Store the xy location of the mouse position on the screen, as values between 0 and 1
+			// And set the del_cell flag and temp box visibility
+			function onMouseMove( event ) {
+				event.preventDefault(); // ??? not too sure what this does
+				saveMouseCoords(event);
+				if (event.shiftKey) {
+					del_cell = true;
+					box_trans.visible = false;
+				} else {
+					del_cell = false;
+					box_trans_del.visible = false;
+				}
+			}
+
+			// ------------------------------------------------
+			// Animation loop
+			// ------------------------------------------------
+
+			// animation loop
+			function animate() {
+				requestAnimationFrame( animate );
+				if (mouse_is_down) {
+					// if we are rotating the view (holding down the mouse), we dont want a glass box
+					renderRotateView();
+				} else {
+					// if we are not rotating, then generate a glass box where the mouse is
+					renderGenerateGlassBox();
+				}
+			}
+
+			// render rotate view, do not draw a glass box
+			function renderRotateView() {
+				box_trans.visible = false;
+				box_trans_del.visible = false;
+				renderer.render( scene, camera );
+			}
+
+			// render ray intersect and draw a glass box
+			function renderGenerateGlassBox() {
+				// get the object in teh scene to check for intersections
+				// the cells_dict and the ground
+				var isect_objs = Object.values(cells_dict); 
+				isect_objs.push(ground);
+				// create a ray from the camera and intersect it with objects in the scene
+				raycaster.setFromCamera( mouse_xy, camera );
+				var intersects = raycaster.intersectObjects( isect_objs );
+				// console.log(intersects);
+
+				if ( intersects.length > 0 ) {
+					// get the first object that the ray intersects
+					var isect0 = intersects[ 0 ];
+					if (isect0.object.name == 'cell') {
+						// if this is a box, then get the centre of the box
+						var cell_cen = isect0.object.position;
+						next_cell_pos = new THREE.Vector3(cell_cen.x, cell_cen.y, cell_cen.z);
+						if (!del_cell) {
+							// if we are adding a new box, then we offset centre based on the face that was intersected
+							if (isect0.faceIndex == 0 || isect0.faceIndex == 1) {
+								next_cell_pos.x += box_size;
+							} else if (isect0.faceIndex == 2 || isect0.faceIndex == 3) {
+								next_cell_pos.x -= box_size;
+							}  else if (isect0.faceIndex == 4 || isect0.faceIndex == 5) {
+								next_cell_pos.y += box_size;
+							}  else if (isect0.faceIndex == 6 || isect0.faceIndex == 7) {
+								next_cell_pos.y -= box_size;
+							}  else if (isect0.faceIndex == 8 || isect0.faceIndex == 9) {
+								next_cell_pos.z += box_size;
+							}  else if (isect0.faceIndex == 10 || isect0.faceIndex == 11) {
+								next_cell_pos.z -= box_size;
+							}
+						}
+						if (del_cell) {
+							// show 'delete' glass box
+							box_trans_del.position.set(next_cell_pos.x, next_cell_pos.y, next_cell_pos.z);
+							box_trans_del.visible = true;
+							box_trans.visible = false;
+						} else {
+							// show 'add' glass box
+							box_trans.position.set(next_cell_pos.x, next_cell_pos.y, next_cell_pos.z);
+							box_trans_del.visible = false;
+							box_trans.visible = true;
+						}
+					} else {
+						// if this is the ground, then get the center from intersection of ground mesh
+						if (!del_cell) {
+							next_cell_pos = new THREE.Vector3();
+							if (num_cells % 2 == 1) { // odd number of cells
+								next_cell_pos.x = Math.round(isect0.point.x / box_size) * box_size;
+								next_cell_pos.y = Math.round(isect0.point.y / box_size) * box_size;
+							} else { // even number of cells
+								next_cell_pos.x = Math.round((box_size_half + isect0.point.x) / box_size) * box_size - box_size_half;
+								next_cell_pos.y = Math.round((box_size_half + isect0.point.y) / box_size) * box_size - box_size_half;
+							}
+							// show 'add' glass box
+							next_cell_pos.z = box_size_half;
+							box_trans.position.set(next_cell_pos.x, next_cell_pos.y, next_cell_pos.z);
+							box_trans_del.visible = false;
+							box_trans.visible = true;
+						}
+					}
+				} else {
+					// the ray intersects with nothing
+					// hide the glass cells
+					box_trans.visible = false;
+					box_trans_del.visible = false;
+				}
+				renderer.render( scene, camera );
+			}
+
+			// ------------------------------------------------
+			// Helpers
+			// ------------------------------------------------
+
+			// Get the coords of the mouse on the whole page, 
+			// and convert it into xy coords relative to the centre of the div container
+			// the coords should be [-1, -1] in the bottom left corner of the div
+			// and [1, 1] in the top right corner of the div
+			function saveMouseCoords(event) {
+				// https://stackoverflow.com/questions/14651306/get-mouse-position-within-div
+				mouse_xy.x = ( (event.pageX - container.offsetLeft ) / container.clientWidth ) * 2 - 1;
+				mouse_xy.y = - ( (event.pageY - container.offsetTop) / container.clientHeight ) * 2 + 1;
+			}
+
+			// Get a dictionary of neighbour keys
+			// Lets say the coords are [1,3,5], then the key of the cell will be 1_3_5
+			// The neighbour keys will be as follows:
+			// up     = 1_3_7
+			// down   = 1_3_3
+			// north  = 1_5_5
+			// south  = 1_1_5
+			// east   = 3_3_5
+			// west   = -1_3_5
+			function getNeighbourKeys( coords ) {
+				var u = coords.x + '_' + coords.y + '_' + (coords.z + 2);
+				var d = coords.x + '_' + coords.y + '_' + (coords.z - 2);
+				var n = coords.x + '_' + (coords.y + 2) + '_' + coords.z;
+				var s = coords.x + '_' + (coords.y - 2) + '_' + coords.z;
+				var e = (coords.x + 2) + '_' + coords.y + '_' + coords.z; 
+				var w = (coords.x - 2) + '_' + coords.y + '_' + coords.z;
+				return {u, d, n, s, e, w};
+			}
+
+			// Get all the neighbour cells of a cell
+			function getNeighbours( cell ) {
+				return Object.values(cell.neighbours).map(key => cells_dict[key]).filter( nei => nei != undefined );
+			}
+
+			// switch a cell to be a sphere
+			function makeCellSphere( cell ) {
+				// console.log('switchToSphere');
+				if (cell.children.length > 0) {
+					if ( cell.shape == 'sphere') { return; }
+					disposeObject(cell, cell.children[0]);
+				}
+				var sphere = new THREE.Mesh( sphere_geom, new THREE.MeshLambertMaterial() );
+				sphere.castShadow = true;
+				sphere.receiveShadow = true;
+				cell.add(sphere);
+				cell.shape = 'sphere';
+			}
+
+			// switch a cell to be a box
+			function makeCellBox( cell ) {
+				// console.log('switchToBox');
+				if (cell.children.length > 0) {
+					if ( cell.shape == 'box') { return; }
+					disposeObject(cell, cell.children[0]);
+				}
+				var box = new THREE.Mesh( 
+					new THREE.BoxBufferGeometry( box_size * 0.95, box_size * 0.95, box_size * 0.95 ), 
+					new THREE.MeshLambertMaterial() );
+				box.castShadow = true;
+				box.receiveShadow = true;
+				cell.add(box);
+				cell.shape = 'box';
+			}
+
+			// change the colour of a cell
+			function changeColour( obj, colour ) {
+				// https://threejs.org/docs/#api/en/materials/MeshLambertMaterial.color
+				// https://threejs.org/docs/#api/en/materials/MeshPhongMaterial.color
+				// https://threejs.org/docs/#api/en/math/Color.set
+				if (obj.material != undefined) {
+					obj.material.color.set( colour );
+				}
+				// change colour of any child objects
+				if (obj.children.length > 0) {
+					for (const child of obj.children) {
+						changeColour(child, colour);
+					}
+				}
+			}
+
+			// change the colour of a cell
+			function changeScale( obj, x_scale, y_scale ) {
+				// https://threejs.org/docs/#api/en/core/Object3D.scale
+				obj.scale.set( x_scale, y_scale, 1 );
+			}
+
+
+			// add a new cell
+			function addCell( key, coords ) {
+				// an invisible box used for ray intersection
+				var cell = new THREE.Mesh( box_geom, box_mat_invisible );
+				cell.castShadow = false;
+				cell.receiveShadow = false;
+				cell.position.set(next_cell_pos.x, next_cell_pos.y, next_cell_pos.z);
+				cell.name = "cell";
+				// add custom properties: neighbours, coords
+				cell.neighbours = getNeighbourKeys( coords );
+				cell.coords = coords;
+				makeCellBox( cell );
+				// add to the scene and the cells_dict dictionary
+				scene.add( cell );
+				cells_dict[key] = cell;
+				// update neighbours
+				var neighbours = getNeighbours( cell );
+				neighbours.push(cell);
+				update(neighbours);
+			}
+
+			// remove an existing cell
+			function removeCell( key ) {
+				var neighbours = getNeighbours(cells_dict[key]);
+				// delete
+				disposeObject( scene, cells_dict[key] );
+				delete cells_dict[key];
+				// update neighbours
+				update(neighbours);
+			}
+
+			// clear mem and removes object from scene
+			function disposeObject(parent, obj) {
+				parent.remove( obj );
+				obj.geometry.dispose();
+				obj.material.dispose();
+			}
+
+			// updates the cells in the list
+			// for each cell, check the neighbours above and below and applies some simpel rules
+			function update( cells ) {
+				for (var cell of cells) {
+					// get the cells n, s, e, w
+					var n = cells_dict[cell.neighbours.n];
+					var s = cells_dict[cell.neighbours.s];
+					var e = cells_dict[cell.neighbours.e];
+					var w = cells_dict[cell.neighbours.w];
+					var neighbours = [n, s, e, w].filter( nei => nei !== undefined );
+
+
+					// ========== RULES ========
+					// https://www.w3schools.com/colors/colors_names.asp
+
+					// -------------------------
+					// RULE 0 neighbours
+					if (neighbours.length == 0) {
+						changeColour(cell, "honeydew");
+						changeScale(cell, 1, 1);
+					} else 
+					// -------------------------
+					// RULE 1 neighbours
+					if (neighbours.length == 1) {
+						changeColour(cell, "lawngreen");
+						changeScale(cell, 1, 1);
+					} else 
+					// -------------------------
+					// RULE 2 neighbours
+					if (neighbours.length == 2) {
+						if ( n != undefined && s != undefined ) {
+							changeColour(cell, "purple");
+							changeScale(cell, 0.5, 1);
+						} else if ( e != undefined && w != undefined ) {
+							changeColour(cell, "cyan");
+							changeScale(cell, 1, 0.5);
+						} else {
+							changeColour(cell, "magenta");
+							changeScale(cell, 1, 1);
+						}
+					} else 
+					// -------------------------
+					// RULE 3 neighbours
+					if (neighbours.length == 3) {
+						changeColour(cell, "darkorange");
+						changeScale(cell, 1, 1);
+					} else 
+					// -------------------------
+					// RULE 4 neighbours
+					{
+						changeColour(cell, "midnightblue");
+						changeScale(cell, 1, 1);
+					}
+					// -------------------------
+
+					// ========== RULES ========
+
+
+				}
+			}
+
+		</script>
+	</body>
+</html>
