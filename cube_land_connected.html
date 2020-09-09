@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Cube Land</title>
+		<link rel="icon" href="data:,">
+		<meta charset="utf-8">
+		<style>
+			body {
+				text-align: center;
+				font-family: Arial, Helvetica, sans-serif;
+			}
+			h1 {
+				font-size: 30px;
+			}
+			p {
+				font-size: 20px;
+			}
+			#container {
+				display: block;
+				margin: auto;
+				padding: 0px;
+                width: 90%;
+				height: 500px;
+				border: 3px solid black;
+			}
+			canvas {
+				display: block;
+				margin: 0px;
+				padding: 0px;
+				outline: none; 
+				border: none;
+				cursor: crosshair;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Connected cubes...</h1>
+		<div id="container"></div>
+		<script type="module">
+
+			// ------------------------------------------------
+			// Import statements
+			// ------------------------------------------------
+
+			import * as THREE from 'https://unpkg.com/three@0.119.1/build/three.module.js';
+			import { OrbitControls } from 'https://unpkg.com/three@0.119.1/examples/jsm/controls/OrbitControls.js';
+
+			// ------------------------------------------------
+			// Main code
+			// ------------------------------------------------
+
+			var camera, scene, renderer, ground,
+			dir_light, dir_light_helper, dir_lightShadowHeper, hemi_light, hemi_light_helper, 
+			raycaster, cell_trans, cell_trans_del, container;
+
+			// cells
+			var sub_cell_size = 12;
+			var cell_size = sub_cell_size * 2;
+			var sub_cell_size_half = sub_cell_size / 2;
+			var cell_geom = new THREE.BoxBufferGeometry( sub_cell_size * 2, sub_cell_size * 2, sub_cell_size * 2 );
+			var cell_geom_del = new THREE.BoxBufferGeometry( sub_cell_size * 2.1, sub_cell_size * 2.1, sub_cell_size * 2.1 );
+
+			// two main types of blocks
+			// these could be imported as obj, with more detail
+			// for corner, for side
+			var box_corner = new THREE.Mesh(
+				new THREE.BoxBufferGeometry( sub_cell_size * 0.6, sub_cell_size * 0.6, sub_cell_size * 0.95 ),
+				new THREE.MeshPhongMaterial()
+			);
+			box_corner.castShadow = true;
+			box_corner.receiveShadow = true;
+			var box_bar = new THREE.Mesh(
+				new THREE.BoxBufferGeometry( sub_cell_size * 0.6, sub_cell_size * 0.95, sub_cell_size * 0.95 ),
+				new THREE.MeshPhongMaterial()
+			);
+			box_bar.castShadow = true;
+			box_bar.receiveShadow = true;
+			var box_move = sub_cell_size * 0.15;
+
+			// ground
+			var num_sub_cells = Math.round(240 / sub_cell_size);
+			var ground_size = num_sub_cells * sub_cell_size;
+
+			// materials
+			var box_mat_trans = new THREE.MeshPhongMaterial( {
+				color: 'white',
+				opacity: 0.3,
+    			transparent: true,
+			});
+			var box_mat_invisible = new THREE.MeshPhongMaterial( {
+				opacity: 0,
+    			transparent: true,
+			});
+
+			// mouse
+			var mouse_xy = new THREE.Vector2(); // the coordinates of the mouse between [-1, -1] and [1,1]
+			var mouse_is_down = false; // true when you hold the mouse button down
+			// var mouse_down = new THREE.Vector2(); // the pixel coords of where of the mouse down event
+			var time_down; // the time when the mouse down buttonw as clicked
+
+			// box settings
+			var cells_dict = {}; // each cell has a key, e.g. "1_3_5", and the value is the cell object
+			var sub_cells_dict = {}; // each sub cell has a key, e.g. "1_3_5", and the value is the cell object
+			var next_cell_pos = new THREE.Vector3(); // store the position where the next cell will be created or deleted
+			var del_cell = false; // is true, a cell will be deleted, if false a cell will be created
+
+			init();
+			animate();
+
+			// ------------------------------------------------
+			// Initialization function
+			// ------------------------------------------------
+
+			function init() {
+
+				// GET CONTAINER
+
+				container = document.getElementById("container");
+
+				// CAMERA AND SCENE
+
+				camera = new THREE.PerspectiveCamera( 55, container.clientWidth / container.clientHeight, 1, 10000 );
+				camera.position.set( 50, 50, 50 );
+				camera.up.set( 0, 0, 1 );
+				scene = new THREE.Scene();
+
+				// SCENE GRID
+
+				var gridGround = new THREE.GridHelper( ground_size, num_sub_cells, "gray", "gray" );
+				gridGround.rotation.x = Math.PI / 2;
+				scene.add( gridGround );
+
+				// AXIS HELPER
+
+				var axesHelper = new THREE.AxesHelper( 600 );
+				scene.add( axesHelper )
+
+				// GROUND
+
+				var ground_geo = new THREE.PlaneBufferGeometry( ground_size, ground_size );
+				var ground_mat = new THREE.MeshLambertMaterial( { color: "blanchedalmond" } );
+				// var ground_mat = new THREE.MeshStandardMaterial( { color: 'white' } )
+				ground_mat.color.setHSL( 0.095, 1, 0.75 );
+				ground = new THREE.Mesh( ground_geo, ground_mat );
+				ground.position.set( 0, 0, -0.5);
+				ground.receiveShadow = true;
+				scene.add( ground );
+
+				// GLASS BOX OF 8 CELLS
+
+				cell_trans = new THREE.Mesh( cell_geom, box_mat_trans );
+				cell_trans.castShadow = false;
+				cell_trans.receiveShadow = false;
+				cell_trans.visible = false;
+				scene.add(cell_trans);
+				cell_trans_del = new THREE.Mesh( cell_geom_del, box_mat_trans );
+				cell_trans_del.castShadow = false;
+				cell_trans_del.receiveShadow = false;
+				cell_trans_del.visible = false;
+				scene.add(cell_trans_del);
+
+				// SCENE BACKGROUND AND FOG
+
+				scene.background = new THREE.Color().setHSL( 0.6, 0, 1 );
+				scene.fog = new THREE.Fog( scene.background, 1, 1500 );
+
+				// HEMISPHERE LIGHT
+
+				hemi_light = new THREE.HemisphereLight( "white", "white", 0.6 );
+				hemi_light.color.setHSL( 0.6, 1, 0.6 );
+				hemi_light.groundColor.setHSL( 0.095, 1, 0.75 );
+				hemi_light.position.set( 0, 0, 100 );
+				hemi_light.up.set( 0, 0, 0 );
+				scene.add( hemi_light );
+
+				// HEMISPHERE LIGHT HELPER
+
+				// hemi_light_helper = new THREE.HemisphereLightHelper( hemi_light, 10 );
+				// scene.add( hemi_light_helper );
+
+				// DIRECTIONAL LIGHT
+
+				dir_light = new THREE.DirectionalLight( 0xffffff, 1 );
+				dir_light.color.setHSL( 0.1, 1, 0.95 );
+				dir_light.position.set( -0.9, -0.8, 1.1 );
+				dir_light.position.multiplyScalar( 200 );
+				scene.add( dir_light );
+
+				// DIRECTIONAL LIGHT HELPER
+
+				// dir_light_helper = new THREE.DirectionalLightHelper( dir_light, 100 );
+				// scene.add( dir_light_helper );
+
+				// DIRECTIONAL LIGHT SHADOWS
+
+				dir_light.castShadow = true;
+				dir_light.shadow.mapSize.width = 2048;
+				dir_light.shadow.mapSize.height = 2048;
+				dir_light.shadow.camera.near = 1;
+				dir_light.shadow.camera.far = 500;
+				dir_light.shadow.camera.left = -100;
+				dir_light.shadow.camera.bottom = -100;
+				dir_light.shadow.camera.top = 100;
+				dir_light.shadow.camera.right = 100;
+
+				// DIRECTIONAL LIGHT SHADOWS HELPER
+
+				// dir_lightShadowHeper = new THREE.CameraHelper( dir_light.shadow.camera );
+				// scene.add( dir_lightShadowHeper );
+
+				// RENDERER
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( container.clientWidth, container.clientHeight );
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap; // default THREE.PCFShadowMap
+
+				// ADD RENDERER TO CONTAINER
+
+				container.appendChild( renderer.domElement );
+				
+				// ORBIT CONTROL
+
+				var controls = new OrbitControls( camera, renderer.domElement );
+
+				// RAYCASTER
+
+				raycaster = new THREE.Raycaster();
+
+				// EVENT LISTENERS
+
+				window.addEventListener( 'resize', onWindowResize, false );
+				document.addEventListener('mousedown', onMouseDown, false);
+				document.addEventListener('mouseup', onMouseUp, false);
+				document.addEventListener( 'mousemove', onMouseMove, false );
+
+			}
+
+			// ------------------------------------------------
+			// Event handeling functions
+			// ------------------------------------------------
+
+			// Resize browser window
+			function onWindowResize() {
+				camera.aspect = container.clientWidth / container.clientHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( container.clientWidth, container.clientHeight );
+			}
+
+			// Handle mouse click events, save the screen position when mouse down
+			function onMouseDown(event) {
+				mouse_is_down = true;
+				time_down = new Date();
+			}
+
+			// Handle mouse click events, 
+			// Either create a box or delete box
+			function onMouseUp(event) {
+				// check is we are rotating the scene
+				mouse_is_down = false;
+				if (new Date() - time_down > 200) {
+					// we are dragging, so no nothing
+					return;
+				}
+				// we are either adding or deleting a cell
+				if (next_cell_pos != null) {
+					var coords = new THREE.Vector3(
+							Math.round(next_cell_pos.x / sub_cell_size_half),
+							Math.round(next_cell_pos.y / sub_cell_size_half),
+							Math.round(next_cell_pos.z / sub_cell_size_half)
+					);
+					var key = coords.x + '_' + coords.y + '_' + coords.z;
+					if (del_cell && key in cells_dict) {
+						// delete an existing cell
+						removeCell( key );
+					} else if (!del_cell) {
+						// add a new cell
+						addCell( key, coords );
+					}
+				}
+			}
+
+			// Handle mouse move events
+			// Store the xy location of the mouse position on the screen, as values between 0 and 1
+			// And set the del_cell flag and temp box visibility
+			function onMouseMove( event ) {
+				event.preventDefault(); // ??? not too sure what this does
+				saveMouseCoords(event);
+				if (event.shiftKey) {
+					del_cell = true;
+					cell_trans.visible = false;
+				} else {
+					del_cell = false;
+					cell_trans_del.visible = false;
+				}
+			}
+
+			// ------------------------------------------------
+			// Animation loop
+			// ------------------------------------------------
+
+			// animation loop
+			function animate() {
+				requestAnimationFrame( animate );
+				if (mouse_is_down) {
+					// if we are rotating the view (holding down the mouse), we dont want a glass box
+					renderRotateView();
+				} else {
+					// if we are not rotating, then generate a glass box where the mouse is
+					renderGenerateGlassBox();
+				}
+			}
+
+			// render rotate view, do not draw a glass box
+			function renderRotateView() {
+				cell_trans.visible = false;
+				cell_trans_del.visible = false;
+				renderer.render( scene, camera );
+			}
+
+			// render ray intersect and draw a glass box
+			function renderGenerateGlassBox() {
+				// get the object in teh scene to check for intersections
+				// the cells_dict and the ground
+				var isect_objs = Object.values(cells_dict); 
+				isect_objs.push(ground);
+				// create a ray from the camera and intersect it with objects in the scene
+				raycaster.setFromCamera( mouse_xy, camera );
+				var intersects = raycaster.intersectObjects( isect_objs );
+				// console.log(intersects);
+				if ( intersects.length > 0 ) {
+					// get the first object that the ray intersects
+					var isect0 = intersects[ 0 ];
+					if (isect0.object.name == 'cell') {
+						// if this is a box, then get the centre of the box
+						var cell_cen = isect0.object.position;
+						if (del_cell) {
+							next_cell_pos.set(cell_cen.x, cell_cen.y, cell_cen.z);
+							// show 'delete' glass box
+							cell_trans_del.position.set(next_cell_pos.x, next_cell_pos.y, next_cell_pos.z);
+							cell_trans_del.visible = true;
+							cell_trans.visible = false;
+						} else {
+							var normal = isect0.face.normal;
+							next_cell_pos.set(
+								cell_cen.x + normal.x * cell_size, 
+								cell_cen.y + normal.y * cell_size,
+								cell_cen.z + normal.z * cell_size
+							);
+							// show 'add' glass box
+							cell_trans.position.set(next_cell_pos.x, next_cell_pos.y, next_cell_pos.z);
+							cell_trans_del.visible = false;
+							cell_trans.visible = true;
+						}
+					} else {
+						// if this is the ground, then get the center from intersection of ground mesh
+						if (!del_cell) {
+							// set next pos
+							setNextPos(isect0.point);
+							// show 'add' glass box
+							cell_trans.position.set(next_cell_pos.x, next_cell_pos.y, next_cell_pos.z);
+							cell_trans_del.visible = false;
+							cell_trans.visible = true;
+						}
+					}
+				} else {
+					// the ray intersects with nothing
+					// hide the glass cells
+					cell_trans.visible = false;
+					cell_trans_del.visible = false;
+				}
+				renderer.render( scene, camera );
+			}
+
+			// ------------------------------------------------
+			// Helpers
+			// ------------------------------------------------
+
+			// round the position on the ground plane to the centre of a cell
+			function setNextPos( point ) {
+				if (num_sub_cells % 2 == 0) { // odd number of cells
+					next_cell_pos.x = Math.round(point.x / cell_size) * cell_size;
+					next_cell_pos.y = Math.round(point.y / cell_size) * cell_size;
+				} else { // even number of cells
+					next_cell_pos.x = (Math.round((sub_cell_size_half + point.x) / cell_size) * cell_size) - sub_cell_size_half;
+					next_cell_pos.y = (Math.round((sub_cell_size_half + point.y) / cell_size) * cell_size) - sub_cell_size_half;
+				}
+				next_cell_pos.z = sub_cell_size;
+			}
+
+			// Get the coords of the mouse on the whole page, 
+			// and convert it into xy coords relative to the centre of the div container
+			// the coords should be [-1, -1] in the bottom left corner of the div
+			// and [1, 1] in the top right corner of the div
+			function saveMouseCoords(event) {
+				// https://stackoverflow.com/questions/14651306/get-mouse-position-within-div
+				mouse_xy.x = ( (event.pageX - container.offsetLeft ) / container.clientWidth ) * 2 - 1;
+				mouse_xy.y = - ( (event.pageY - container.offsetTop) / container.clientHeight ) * 2 + 1;
+			}
+
+			// Get a dictionary of neighbour keys
+			// Lets say the coords are [1,3,5], then the key of the cell will be 1_3_5
+			// The neighbour keys will be as follows:
+			// up     = 1_3_7
+			// down   = 1_3_3
+			// north  = 1_5_5
+			// south  = 1_1_5
+			// east   = 3_3_5
+			// west   = -1_3_5
+			function getNeighbourKeys( sub_cell ) {
+				var coords = sub_cell.coords;
+				var u = coords.x + '_' + coords.y + '_' + (coords.z + 2);
+				var d = coords.x + '_' + coords.y + '_' + (coords.z - 2);
+				var n = coords.x + '_' + (coords.y + 2) + '_' + coords.z;
+				var s = coords.x + '_' + (coords.y - 2) + '_' + coords.z;
+				var e = (coords.x + 2) + '_' + coords.y + '_' + coords.z; 
+				var w = (coords.x - 2) + '_' + coords.y + '_' + coords.z;
+				return {u, d, n, s, e, w};
+			}
+
+			// Get a list of unique neighbour sub cells from a list of sub cells
+			function getAllNeighbourKeys( sub_cells ) {
+				var keys = new Set();
+				for (var sub_cell of sub_cells) {
+					keys.add(sub_cell.key);
+					for (var key of Object.values(sub_cell.nei_keys)) {
+						keys.add(key);
+					}
+				}
+				return Array.from(keys);
+			}
+
+			// Get sub cells of a list of sub cell keys
+			// only returns sub cells that are not undefined
+			function getSubCells( keys ) {
+				return keys.map(key => sub_cells_dict[key]).filter( sub_cell => sub_cell != undefined );
+			}
+
+			// add a new cell, including 8 sub cells
+			function addCell( key, coords ) {
+				// an invisible box used for ray intersection
+				var cell = new THREE.Mesh( cell_geom, box_mat_invisible );
+				cell.castShadow = false;
+				cell.receiveShadow = false;
+				cell.position.set(next_cell_pos.x, next_cell_pos.y, next_cell_pos.z);
+				cell.name = "cell";
+				cell.coords = coords;
+				// add 8 boxes
+				var sub_cells = [];
+				sub_cells.push( addSubCellGroup(cell, -1, -1, -1) );
+				sub_cells.push( addSubCellGroup(cell, -1, 1, -1) );
+				sub_cells.push( addSubCellGroup(cell, 1, -1, -1) );
+				sub_cells.push( addSubCellGroup(cell, 1, 1, -1) );
+				sub_cells.push( addSubCellGroup(cell, -1, -1, 1) );
+				sub_cells.push( addSubCellGroup(cell, -1, 1, 1) );
+				sub_cells.push( addSubCellGroup(cell, 1, -1, 1) );
+				sub_cells.push( addSubCellGroup(cell, 1, 1, 1) );
+				// add to the scene and the cells_dict dictionary
+				scene.add( cell );
+				cells_dict[key] = cell;
+				// save the sub_cell neighbours of this cell
+				cell.nei_keys = getAllNeighbourKeys( sub_cells );
+				// update the neighbours
+				update( getSubCells(cell.nei_keys) );
+			}
+
+			// add a new sub cell
+			function addSubCellGroup( cell, x, y, z ) {
+				// create a group
+				var group = new THREE.Group();
+				group.position.set( x * sub_cell_size_half, y * sub_cell_size_half, z * sub_cell_size_half);
+				group.castShadow = true;
+				group.receiveShadow = true;
+				// properties
+				var coords = new THREE.Vector3(cell.coords.x + x, cell.coords.y + y, cell.coords.z + z);
+				var key = coords.x + '_' + coords.y + '_' + coords.z
+				group.shape = "box";
+				group.key = key;
+				group.coords = coords;
+				group.nei_keys = getNeighbourKeys( group );
+				// add to the scene and the sub_cells_dict dictionary
+				cell.add( group );
+				sub_cells_dict[key] = group;
+				// return the sub cell
+				return group;
+			}
+
+			// remove an existing cell, including 8 sub cells
+			function removeCell( key ) {
+				// get the cell and sub cells
+				var cell = cells_dict[key];
+				var sub_cells = cell.children;
+				// delete the 8 children from the sub_cells_dict
+				for (var sub_cell of sub_cells) {
+					delete sub_cells_dict[sub_cell.key];
+				}
+				// get the neighbour cells before deleting teh cell
+				var nei_sub_cells = getSubCells( cell.nei_keys );
+				// delete the cell
+				delete cells_dict[key];
+				disposeObject( cell );
+				// update neighbours
+				update(nei_sub_cells);
+			}
+
+			// clear mem and removes object from scene
+			function disposeObject(obj) {
+				obj.parent.remove( obj );
+				obj.geometry.dispose();
+				obj.material.dispose();
+			}
+
+			const types = {
+				N: 'n',
+				S: 's',
+				E: 'e',
+				W: 'w',
+				NE: 'ne',
+				SE: 'se',
+				NW: 'nw',
+				SW: 'sw',
+				X: 'x'
+			}
+
+			// change the type of object in this cell
+			function changeShape( group, type) {
+				if (group.shape == type) { return; }
+				// del any existing objects
+				for (var child of  group.children) {
+					disposeObject( child );
+				}
+				// https://threejs.org/docs/#api/en/core/Object3D.rotateZ
+				switch (type) {
+					case types.N:
+						var mesh = box_bar.clone();
+						mesh.rotateZ(Math.PI / 2);
+						mesh.position.set(0, -box_move, 0);
+						group.add(mesh);
+						break;
+					case types.S:
+						var mesh = box_bar.clone();
+						mesh.rotateZ(Math.PI / 2);
+						mesh.position.set(0, box_move, 0);
+						group.add(mesh);
+						break;
+					case types.E:
+						var mesh = box_bar.clone();
+						mesh.position.set(-box_move, 0, 0);
+						group.add(mesh);
+						break;
+					case types.W:
+						var mesh = box_bar.clone();
+						mesh.position.set(box_move, 0, 0);
+						group.add(mesh);
+						break;
+
+					case types.NE:
+						var mesh = box_corner.clone();
+						mesh.position.set(-box_move, -box_move, 0);
+						group.add(mesh);
+						break;
+					case types.SE:
+						var mesh = box_corner.clone();
+						mesh.position.set(-box_move, box_move, 0);
+						group.add(mesh);
+						break;
+					case types.NW:
+						var mesh = box_corner.clone();
+						mesh.position.set(box_move, -box_move, 0);
+						group.add(mesh);
+						break;
+					case types.SW:
+						var mesh = box_corner.clone();
+						mesh.position.set(box_move, box_move, 0);
+						group.add(mesh);
+						break;
+
+					default:
+						break;
+				}
+				group.shape = type;
+			}
+
+			// updates the cells in the list
+			// for each cell, check the neighbours above and below and applies some simpel rules
+			function update( sub_cells ) {
+				for (var sub_cell of sub_cells) {
+					// get the cells n, s, e, w
+					var n = sub_cells_dict[sub_cell.nei_keys.n];
+					var s = sub_cells_dict[sub_cell.nei_keys.s];
+					var e = sub_cells_dict[sub_cell.nei_keys.e];
+					var w = sub_cells_dict[sub_cell.nei_keys.w];
+					var neighbours = [n, s, e, w].filter( nei => nei !== undefined );
+
+					// ========== RULES ========
+
+					// -------------------------
+					// RULE for a block in the middle, fully surrounded by other blocks
+					if (neighbours.length == 4) {
+						changeShape( sub_cell, types.X );
+					} else 
+					// -------------------------
+					// RULE for a bar block, one side is open
+					if (neighbours.length == 3) {
+						if (n == undefined) { changeShape( sub_cell, types.N ); }
+						else if (s == undefined) { changeShape( sub_cell, types.S ); }
+						else if (e == undefined) { changeShape( sub_cell, types.E ); }
+						else { changeShape( sub_cell, types.W ); }
+					} else 
+					// -------------------------
+					// RULE for corner blocks, 2 sides are open
+					if (neighbours.length == 2) {
+						if (n == undefined && e == undefined) { changeShape( sub_cell, types.NE ); }
+						else if (s == undefined && e == undefined) { changeShape( sub_cell, types.SE ); }
+						else if (s == undefined && w == undefined) { changeShape( sub_cell, types.SW ); }
+						else { changeShape( sub_cell, types.NW ); }
+					}
+					// -------------------------
+					
+					// ========== RULES ========
+
+
+				}
+			}
+
+		</script>
+	</body>
+</html>
